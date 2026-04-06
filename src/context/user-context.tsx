@@ -35,12 +35,18 @@ interface UserContextType {
   logout: () => void;
   updateScore: (points: number) => void;
   updateLevel: (newLevel: number) => void;
+  isNewUser: boolean;
+  setIsNewUser: (isNew: boolean) => void;
+  activeHoverTour: string | null;
+  setActiveHoverTour: (id: string | null) => void;
 }
 
 const UserContext = createContext<UserContextType | undefined>(undefined);
 
 export function UserProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
+  const [isNewUser, setIsNewUser] = useState<boolean>(false);
+  const [activeHoverTour, setActiveHoverTour] = useState<string | null>(null);
 
   // Load user data from localStorage on initial load
   useEffect(() => {
@@ -267,7 +273,7 @@ export function UserProvider({ children }: { children: ReactNode }) {
     }
   };
   return (
-    <UserContext.Provider value={{ user, login, signup, logout, updateScore, updateLevel }}>
+    <UserContext.Provider value={{ user, login, signup, logout, updateScore, updateLevel, isNewUser, setIsNewUser, activeHoverTour, setActiveHoverTour }}>
       {children}
     </UserContext.Provider>
   );

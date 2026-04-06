@@ -5,11 +5,15 @@ import { Navigation } from "@/components/Navigation";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
-import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useUser } from "@/context/user-context";
+import { AegisGuide } from "@/components/AegisGuide";
+import { ModuleBriefing } from "@/components/ModuleBriefing";
+import { FirstTimeTour } from "@/components/FirstTimeTour";
+import { GameModeModule } from "@/components/GameModeModule";
+import { SideScrollerLevel } from "@/components/SideScrollerLevel";
 import {
   Lock,
   Unlock,
@@ -23,85 +27,104 @@ import {
   XCircle
 } from "lucide-react";
 import { useRouter } from "next/navigation";
+import zxcvbn from "zxcvbn";
+import { getAegisDialogue, getFirstTimeGuidance, getSuccessGuidance } from "@/lib/aegis-dialogues";
 
 export default function CrackTheVault() {
   const router = useRouter();
   const { user, updateScore } = useUser();
   const [password, setPassword] = useState("");
-  const [showPassword, setShowPassword] = useState(false);
   const [strength, setStrength] = useState(0);
   const [strengthLabel, setStrengthLabel] = useState("Very Weak");
   const [crackTime, setCrackTime] = useState("Instantly");
   const [feedback, setFeedback] = useState<string[]>([]);
+  const [dictionaryWords, setDictionaryWords] = useState<string[]>([]);
   const [score, setScore] = useState(0);
   const [xp, setXp] = useState(0);
   const [level, setLevel] = useState(1);
   const [unlocked, setUnlocked] = useState(false);
   const [attempts, setAttempts] = useState(0);
 
-  // Password strength evaluation logic
+  // Aegis guidance system
+  const [aegisMessage, setAegisMessage] = useState<{ text: string; type: "info" | "warning" | "success" | "tip"; audioFile?: string; isBlocking?: boolean } | null>(null);
+  const [showAegis, setShowAegis] = useState(true);
+  const [gameState, setGameState] = useState<"scrolling" | "vault">("scrolling");
+  const [isBlocked, setIsBlocked] = useState(false);
+
+  const handleReachVault = () => {
+    setGameState("vault");
+    setAegisMessage({
+      text: "You are now in Admin Mode. Secure this compromised vault by constructing a password payload strong enough to resist modern brute-force dictionaries. I'll provide real-time feedback as you type.",
+      type: "info",
+      audioFile: "/audio/vault-reached.mp3",
+    });
+  };
+
+  const handleCheckpoint = (id: string) => {
+    // SideScrollerLevel now handles info blocks internally. No Aegis dialogue needed.
+  };
+
+  const handleSkipGuide = () => {
+    setIsBlocked(false);
+    setAegisMessage(null);
+  };
+
+  // Password strength evaluation logic using zxcvbn
   const evaluatePasswordStrength = (pwd: string) => {
-    let score = 0;
-    let feedback: string[] = [];
-
-    // Length check
-    if (pwd.length < 8) {
-      feedback.push("Use at least 8 characters");
-    } else {
-      score += 20;
-      if (pwd.length >= 12) score += 10;
-      if (pwd.length >= 16) score += 10;
+    if (!pwd) {
+      return {
+        score: 0,
+        label: "Very Weak",
+        time: "Instantly",
+        feedback: ["Enter a password to check its strength"],
+        dictionaryWords: []
+      };
     }
 
-    // Character variety
-    if (/[a-z]/.test(pwd)) score += 10;
-    else feedback.push("Add lowercase letters");
+    const result = zxcvbn(pwd);
 
-    if (/[A-Z]/.test(pwd)) score += 10;
-    else feedback.push("Add uppercase letters");
+    // Map zxcvbn score (0-4) to percentage (0-100)
+    const scorePercentage = (result.score / 4) * 100;
 
-    if (/[0-9]/.test(pwd)) score += 10;
-    else feedback.push("Add numbers");
-
-    if (/[^A-Za-z0-9]/.test(pwd)) score += 20;
-    else feedback.push("Add special characters");
-
-    // Common patterns
-    if (/(.)\1{2,}/.test(pwd)) {
-      score -= 20;
-      feedback.push("Avoid repeated characters");
-    }
-
-    if (/(123|abc|qwe|password|admin)/i.test(pwd)) {
-      score -= 30;
-      feedback.push("Avoid common patterns");
-    }
-
-    // Bonus for complexity
-    if (pwd.length >= 12 && /[^A-Za-z0-9]/.test(pwd)) score += 10;
-
-    // Ensure score is between 0 and 100
-    score = Math.max(0, Math.min(100, score));
-
-    // Determine strength label and crack time
+    // Determine strength label
     let label = "Very Weak";
-    let time = "Instantly";
+    if (result.score === 4) label = "Very Strong";
+    else if (result.score === 3) label = "Strong";
+    else if (result.score === 2) label = "Medium";
+    else if (result.score === 1) label = "Weak";
 
-    if (score >= 80) {
-      label = "Very Strong";
-      time = "Centuries";
-    } else if (score >= 60) {
-      label = "Strong";
-      time = "Years";
-    } else if (score >= 40) {
-      label = "Medium";
-      time = "Days";
-    } else if (score >= 20) {
-      label = "Weak";
-      time = "Hours";
+    // Get crack time
+    const time = result.crack_times_display.offline_slow_hashing_1e4_per_second;
+
+    // Get feedback
+    const feedback = [...result.feedback.suggestions];
+    if (result.feedback.warning) {
+      feedback.unshift(result.feedback.warning);
     }
 
-    return { score, label, time, feedback };
+    // Extract dictionary words if any
+    const dictionaryWords: string[] = [];
+    if (result.sequence) {
+      result.sequence.forEach((item: any) => {
+        if (item.dictionary_name && item.matched_word) {
+          dictionaryWords.push(item.matched_word);
+        }
+      });
+    }
+
+    // Add specific feedback about dictionary words
+    if (dictionaryWords.length > 0) {
+      feedback.unshift(`Contains common dictionary words: ${dictionaryWords.join(', ')}`);
+      feedback.unshift('Dictionary words make passwords easier to crack');
+    }
+
+    return {
+      score: scorePercentage,
+      label,
+      time,
+      feedback,
+      dictionaryWords
+    };
   };
 
   // Evaluate password when it changes
@@ -112,13 +135,40 @@ export default function CrackTheVault() {
       setStrengthLabel(result.label);
       setCrackTime(result.time);
       setFeedback(result.feedback);
+      setDictionaryWords(result.dictionaryWords);
     } else {
       setStrength(0);
       setStrengthLabel("Very Weak");
       setCrackTime("Instantly");
       setFeedback([]);
+      setDictionaryWords([]);
+      setAegisMessage(null);
     }
   }, [password]);
+
+  // Only trigger voice/aegis dialogue on explicit check
+  const handleCheckPassword = () => {
+    if (!password) return;
+
+    const hasLowercase = /[a-z]/.test(password);
+    const hasUppercase = /[A-Z]/.test(password);
+    const hasNumbers = /[0-9]/.test(password);
+    const hasSymbols = /[^A-Za-z0-9]/.test(password);
+
+    const aegisDialogue = getAegisDialogue({
+      password,
+      strength,
+      dictionaryWords,
+      feedback,
+      hasLowercase,
+      hasUppercase,
+      hasNumbers,
+      hasSymbols,
+      length: password.length
+    });
+
+    setAegisMessage(aegisDialogue as any);
+  };
 
   // Handle password submission
   const handleSubmit = () => {
@@ -146,6 +196,10 @@ export default function CrackTheVault() {
       if (user) {
         updateScore(earnedXp);
       }
+
+      // Show success message from Aegis
+      const successMessage = getSuccessGuidance(earnedXp, attempts + 1);
+      setAegisMessage(successMessage as any);
     } else {
       // Partial XP for attempts
       const partialXp = Math.floor(earnedXp * 0.5);
@@ -207,6 +261,9 @@ export default function CrackTheVault() {
   return (
     <div className="min-h-screen bg-gradient-dark">
       <Navigation />
+
+      {/* Aegis Guide Component */}
+      <AegisGuide message={aegisMessage} isVisible={showAegis} onSkip={handleSkipGuide} />
 
       <main className="container mx-auto px-4 py-8 mt-16">
         {/* Header */}
@@ -283,6 +340,59 @@ export default function CrackTheVault() {
                           </div>
 
                           <div className="space-y-2">
+                            <h4 className="font-bold text-foreground">Dictionary Words & Password Security:</h4>
+                            <p>
+                              Dictionary attacks are one of the most common methods used by hackers to crack passwords.
+                              These attacks use lists of common words, phrases, and previously breached passwords to guess
+                              user credentials. Passwords containing dictionary words are significantly weaker because
+                              they can be cracked much faster than truly random passwords.
+                            </p>
+                            <div className="space-y-2">
+                              <h5 className="font-semibold text-foreground">Why Dictionary Words Are Dangerous:</h5>
+                              <ul className="list-disc pl-5 space-y-1">
+                                <li>Common words are easy to guess and found in wordlists used by hackers</li>
+                                <li>Even with numbers or symbols added, dictionary words remain vulnerable</li>
+                                <li>Modern cracking tools can test billions of word combinations per second</li>
+                                <li>Personal information (names, pets, hobbies) are also dictionary words to attackers</li>
+                              </ul>
+                            </div>
+                            <div className="space-y-2">
+                              <h5 className="font-semibold text-foreground">Personal Information Targeting:</h5>
+                              <p>
+                                Attackers specifically target personal information when trying to crack passwords. They gather
+                                names, birthdays, pet names, and other personal details from:
+                              </p>
+                              <ul className="list-disc pl-5 space-y-1">
+                                <li>Social media profiles (Facebook, LinkedIn, Instagram)</li>
+                                <li>Public records and professional directories</li>
+                                <li>Previous data breaches</li>
+                                <li>Direct social engineering interactions</li>
+                              </ul>
+                              <p>
+                                Using tools like <code>cewl</code>, attackers can create custom wordlists from a person's
+                                website or social media content, making name-based attacks even more effective.
+                              </p>
+                            </div>
+                            <div className="space-y-2">
+                              <h5 className="font-semibold text-foreground">How to Avoid Dictionary Words:</h5>
+                              <ul className="list-disc pl-5 space-y-1">
+                                <li>Use passphrases instead of single words (e.g., "PurpleTiger$Jumped@Moon" rather than "purple")</li>
+                                <li>Create acronyms from sentences (e.g., "My1stCarW@5Red!" from "My first car was red!")</li>
+                                <li>Use random combinations of words not typically used together</li>
+                                <li>Include numbers and symbols in unpredictable positions</li>
+                                <li><strong>Avoid all personal information</strong> (names, dates, pet names) in passwords</li>
+                              </ul>
+                            </div>
+                            <div className="p-3 rounded-lg bg-blue-500/10 border border-blue-500/30">
+                              <p className="text-sm text-blue-200">
+                                <strong>Pro Tip:</strong> The password "correcthorsebatterystaple" became famous for
+                                illustrating how longer, random combinations of words can be more secure than
+                                traditional complex passwords with symbols and numbers.
+                              </p>
+                            </div>
+                          </div>
+
+                          <div className="space-y-2">
                             <h4 className="font-bold text-foreground">Best Practices:</h4>
                             <ul className="list-disc pl-5 space-y-1">
                               <li>Use 12+ characters (longer is stronger)</li>
@@ -301,6 +411,31 @@ export default function CrackTheVault() {
                               strong, random passwords and syncing across devices. MFA adds extra security layers
                               beyond passwords, such as authentication apps or hardware keys.
                             </p>
+                          </div>
+
+                          <div className="space-y-2">
+                            <h4 className="font-bold text-foreground">How Password Strength Checkers Work:</h4>
+                            <p>
+                              Modern password strength checkers like the one in this module use sophisticated algorithms
+                              to evaluate password security. Our implementation uses the industry-standard zxcvbn library
+                              developed by Dropbox, which analyzes passwords based on multiple factors:
+                            </p>
+                            <div className="space-y-2">
+                              <h5 className="font-semibold text-foreground">Key Analysis Factors:</h5>
+                              <ul className="list-disc pl-5 space-y-1">
+                                <li><strong>Dictionary Word Detection:</strong> Checks against lists of common words and previously breached passwords</li>
+                                <li><strong>Pattern Recognition:</strong> Identifies common patterns like keyboard sequences (qwerty) or repeated characters</li>
+                                <li><strong>Entropy Calculation:</strong> Measures randomness and unpredictability of character combinations</li>
+                                <li><strong>Brute Force Resistance:</strong> Estimates how long it would take to crack the password using computational methods</li>
+                                <li><strong>Personal Information:</strong> Detects names, dates, and other personal information that might be easily guessed</li>
+                              </ul>
+                            </div>
+                            <div className="p-3 rounded-lg bg-purple-500/10 border border-purple-500/30">
+                              <p className="text-sm text-purple-200">
+                                <strong>Security Insight:</strong> A strong password isn't just about complexity symbols.
+                                It's about unpredictability and avoiding any patterns that attackers commonly look for.
+                              </p>
+                            </div>
                           </div>
 
                           <div className="space-y-2">
@@ -328,214 +463,112 @@ export default function CrackTheVault() {
                     </div>
                   </TabsContent>
                   <TabsContent value="practice" className="mt-0">
-                    {!unlocked ? (
-                      <div className="space-y-6">
-                        <div className="text-center">
-                          <div className="inline-flex items-center justify-center w-24 h-24 mb-4 cyber-border rounded-2xl bg-primary/10" role="img" aria-label="Locked vault icon">
-                            <Lock className="w-12 h-12 text-primary" />
-                          </div>
-                          <h2 className="text-2xl font-bold text-foreground mb-2">Secure the Vault</h2>
-                          <p className="text-muted-foreground">
-                            Create a strong password to unlock the digital vault
+                    {gameState === "scrolling" ? (
+                      <div className="space-y-4">
+                        <div className="text-center mb-4">
+                          <h3 className="text-xl font-bold text-cyan-400 mb-2">Journey to the Vault</h3>
+                          <p className="text-sm text-muted-foreground">
+                            Walk to the vault and press ENTER to begin your password challenge
                           </p>
                         </div>
 
+                        <SideScrollerLevel
+                          onReachVault={handleReachVault}
+                          onCheckpoint={handleCheckpoint}
+                          isBlocked={isBlocked}
+                        />
+
+                        {/* Instructions */}
+                        <Card className="bg-slate-900/50 border-cyan-500/30">
+                          <CardContent className="p-4">
+                            <div className="flex items-center justify-between text-sm text-cyan-300">
+                              <div className="flex items-center gap-4">
+                                <span><kbd className="px-2 py-1 bg-slate-800 rounded">←→</kbd> or <kbd className="px-2 py-1 bg-slate-800 rounded">AD</kbd> Move</span>
+                                <span>•</span>
+                                <span><kbd className="px-2 py-1 bg-slate-800 rounded">ENTER</kbd> Enter Vault</span>
+                              </div>
+                              <div className="text-xs text-slate-400">
+                                Reach 100% to unlock password challenge
+                              </div>
+                            </div>
+                          </CardContent>
+                        </Card>
+                      </div>
+                    ) : (
+                      // THE VAULT PASSWORD UI
+                      <div className="space-y-6">
+                        <div className="text-center mb-6">
+                          <h3 className="text-2xl font-bold text-cyan-400 mb-2">Vault Admin Root</h3>
+                          <p className="text-slate-400">Construct an unbreakable payload to secure the system.</p>
+                        </div>
+
                         <div className="space-y-4">
+                          <div>
+                            <Label htmlFor="password-input">Password Core String</Label>
+                            <Input
+                              id="password-input"
+                              type="text"
+                              value={password}
+                              onChange={(e) => setPassword(e.target.value)}
+                              onKeyDown={handleKeyPress}
+                              disabled={unlocked}
+                              className="font-mono text-lg mt-2 bg-slate-900 border-cyan-700/50"
+                              placeholder="Enter your payload here..."
+                            />
+                          </div>
+
+                          {/* Live Strength Feedback */}
                           <div className="space-y-2">
-                            <Label htmlFor="password" className="text-foreground">
-                              Your Password
-                            </Label>
-                            <div className="relative">
-                              <Input
-                                id="password"
-                                type={showPassword ? "text" : "password"}
-                                value={password}
-                                onChange={(e) => setPassword(e.target.value)}
-                                onKeyPress={handleKeyPress}
-                                placeholder="Enter a strong password..."
-                                className="pr-12 h-12 bg-background/50 border-border/50 focus:border-primary"
-                                aria-describedby="password-requirements"
+                            <div className="flex justify-between text-sm mt-4">
+                              <span className="text-slate-400">Encryption Strength</span>
+                              <span className={getStrengthColor()}>{strengthLabel} ({Math.round(strength)}%)</span>
+                            </div>
+
+                            <div className="h-4 bg-slate-800 rounded-full overflow-hidden border border-slate-700">
+                              <div
+                                className={`h-full transition-all duration-300 ${getStrengthBarColor().replace('[&>div]:', '')}`}
+                                style={{ width: `${strength}%` }}
                               />
-                              <Button
-                                variant="ghost"
-                                size="icon"
-                                className="absolute right-2 top-1/2 -translate-y-1/2"
-                                onClick={() => setShowPassword(!showPassword)}
-                                aria-label={showPassword ? "Hide password" : "Show password"}
-                              >
-                                {showPassword ? (
-                                  <EyeOff className="h-5 w-5 text-muted-foreground" />
-                                ) : (
-                                  <Eye className="h-5 w-5 text-muted-foreground" />
-                                )}
-                              </Button>
+                            </div>
+
+                            <div className="flex justify-between text-xs mt-1">
+                              <span className="text-slate-500">Estimated Crack Time:</span>
+                              <span className={`font-mono ${getCrackTimeColor()}`}>{crackTime}</span>
                             </div>
                           </div>
 
-                          {/* Password Strength Meter */}
-                          {password && (
-                            <div className="space-y-3">
-                              <div className="flex justify-between items-center">
-                                <span className="text-sm font-medium text-foreground">Strength: {strengthLabel}</span>
-                                <span className="text-sm text-muted-foreground">{strength}/100</span>
-                              </div>
-                              <Progress 
-                                value={strength} 
-                                className={`h-3 ${getStrengthBarColor()}`}
-                                aria-label={`Password strength: ${strengthLabel}`}
-                              />
-
-                              <div className="text-sm">
-                                <span className="font-medium text-foreground">Estimated crack time: </span>
-                                <span className={getCrackTimeColor()}>
-                                  {crackTime}
-                                </span>
-                              </div>
-
-                              {/* Strength Description */}
-                              <div className="p-3 rounded-lg bg-muted/50 border border-border/50">
-                                <p className="text-sm text-foreground">
-                                  {getStrengthDescription()}
-                                </p>
-                              </div>
-                            </div>
-                          )}
-
-                          {/* Password Requirements */}
-                          <div className="p-4 rounded-lg bg-muted/50 border border-border/50">
-                            <h4 className="font-medium text-foreground mb-3">Password Requirements:</h4>
-                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-                              {[
-                                {
-                                  label: "At least 8 characters",
-                                  met: password.length >= 8,
-                                  required: true
-                                },
-                                {
-                                  label: "Uppercase letter",
-                                  met: /[A-Z]/.test(password),
-                                  required: false
-                                },
-                                {
-                                  label: "Lowercase letter",
-                                  met: /[a-z]/.test(password),
-                                  required: false
-                                },
-                                {
-                                  label: "Number",
-                                  met: /[0-9]/.test(password),
-                                  required: false
-                                },
-                                {
-                                  label: "Special character",
-                                  met: /[^A-Za-z0-9]/.test(password),
-                                  required: false
-                                },
-                                {
-                                  label: "At least 12 characters (bonus)",
-                                  met: password.length >= 12,
-                                  required: false
-                                }
-                              ].map((req, index) => (
-                                <div key={index} className="flex items-center gap-2">
-                                  {req.met ? (
-                                    <CheckCircle2 className="h-4 w-4 text-green-500" />
-                                  ) : (
-                                    <XCircle className="h-4 w-4 text-muted-foreground" />
-                                  )}
-                                  <span className={`text-sm ${req.met ? 'text-green-500' : 'text-muted-foreground'}`}>
-                                    {req.label}
-                                    {req.required && <span className="text-red-500"> *</span>}
-                                  </span>
-                                </div>
-                              ))}
-                            </div>
-                          </div>
-
-                          {/* Feedback */}
+                          {/* Live Hints/Feedback */}
                           {feedback.length > 0 && (
-                            <div className="p-4 rounded-lg bg-yellow-500/10 border border-yellow-500/30">
-                              <div className="flex items-center gap-2 mb-2">
-                                <AlertTriangle className="h-4 w-4 text-yellow-500" />
-                                <span className="font-medium text-yellow-500">Tips to improve:</span>
-                              </div>
-                              <ul className="text-sm space-y-1">
-                                {feedback.map((tip, index) => (
-                                  <li key={index} className="flex items-start gap-2">
-                                    <span className="text-yellow-500">•</span>
-                                    <span className="text-yellow-200">{tip}</span>
-                                  </li>
+                            <div className="mt-4 p-4 rounded-lg bg-red-500/10 border border-red-500/30 space-y-2">
+                              <h4 className="text-sm font-bold text-red-400 flex items-center gap-2">
+                                <AlertTriangle className="w-4 h-4" /> Vulnerabilities Detected
+                              </h4>
+                              <ul className="list-disc pl-5 text-sm text-red-300 space-y-1">
+                                {feedback.map((tip, i) => (
+                                  <li key={i}>{tip}</li>
                                 ))}
                               </ul>
                             </div>
                           )}
 
-                          <Button
-                            onClick={handleSubmit}
-                            className="w-full gradient-primary"
-                            disabled={!password}
-                          >
-                            Attempt Unlock
-                          </Button>
-                        </div>
-                      </div>
-                    ) : (
-                      <div className="text-center py-8">
-                        <div className="inline-flex items-center justify-center w-24 h-24 mb-6 cyber-border rounded-2xl bg-green-500/10" role="img" aria-label="Unlocked vault icon">
-                          <Unlock className="w-12 h-12 text-green-500" />
-                        </div>
-                        <h2 className="text-2xl font-bold text-green-500 mb-2">Vault Unlocked!</h2>
-                        <p className="text-muted-foreground mb-6">
-                          Congratulations! You've created a strong password.
-                        </p>
+                          <div className="flex gap-4 mt-6">
+                            <Button
+                              variant="outline"
+                              className="w-1/3 h-12 border-cyan-700/50 text-cyan-300 hover:bg-cyan-900/30 hover:text-cyan-200"
+                              onClick={handleCheckPassword}
+                              disabled={unlocked || password.length === 0}
+                            >
+                              Check
+                            </Button>
 
-                        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 max-w-md mx-auto mb-6">
-                          <div className="glass-card p-4 rounded-lg">
-                            <div className="text-3xl font-bold text-primary">+{xp}</div>
-                            <div className="text-sm text-muted-foreground">XP Earned</div>
+                            <Button
+                              className="flex-1 gradient-primary font-bold text-lg h-12"
+                              onClick={handleSubmit}
+                              disabled={unlocked || password.length === 0}
+                            >
+                              {unlocked ? "Vault Secured!" : "Deploy Security Payload"}
+                            </Button>
                           </div>
-                          <div className="glass-card p-4 rounded-lg">
-                            <div className="text-3xl font-bold text-primary">{attempts}</div>
-                            <div className="text-sm text-muted-foreground">Attempts</div>
-                          </div>
-                          <div className="glass-card p-4 rounded-lg">
-                            <div className="text-3xl font-bold text-primary">{strength}%</div>
-                            <div className="text-sm text-muted-foreground">Strength</div>
-                          </div>
-                        </div>
-
-                        {/* Badges */}
-                        <div className="mb-6">
-                          <h4 className="font-medium text-foreground mb-3">Badges Earned</h4>
-                          <div className="flex flex-wrap gap-2 justify-center">
-                            {strength >= 80 && (
-                              <Badge className="bg-green-500/20 text-green-500 border-green-500/30">
-                                <Shield className="h-4 w-4 mr-1" />
-                                Vault Master
-                              </Badge>
-                            )}
-                            {strength === 100 && (
-                              <Badge className="bg-yellow-500/20 text-yellow-500 border-yellow-500/30">
-                                <Trophy className="h-4 w-4 mr-1" />
-                                Perfect Security
-                              </Badge>
-                            )}
-                            {attempts === 1 && (
-                              <Badge className="bg-blue-500/20 text-blue-500 border-blue-500/30">
-                                <Zap className="h-4 w-4 mr-1" />
-                                First Try
-                              </Badge>
-                            )}
-                          </div>
-                        </div>
-
-                        <div className="flex gap-3 justify-center">
-                          <Button onClick={resetGame} variant="outline" className="border-primary/30">
-                            Try Again
-                          </Button>
-                          <Button onClick={() => router.push("/modules")} className="gradient-primary">
-                            Back to Modules
-                          </Button>
                         </div>
                       </div>
                     )}
@@ -610,6 +643,10 @@ export default function CrackTheVault() {
                     <li className="flex items-start gap-2">
                       <XCircle className="h-4 w-4 text-red-500 mt-0.5" />
                       <span className="text-muted-foreground">Avoid common words or patterns</span>
+                    </li>
+                    <li className="flex items-start gap-2">
+                      <XCircle className="h-4 w-4 text-red-500 mt-0.5" />
+                      <span className="text-muted-foreground">Avoid dictionary words (use passphrases instead)</span>
                     </li>
                   </ul>
                 </div>
