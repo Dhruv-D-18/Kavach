@@ -5,21 +5,21 @@ import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Card } from "@/components/ui/card";
 import { MessageCircle } from "lucide-react";
 
-interface AegisMessage {
+interface CypherMessage {
   text: string;
   type: "info" | "warning" | "success" | "tip";
   audioFile?: string;
   isBlocking?: boolean;
 }
 
-interface AegisGuideProps {
-  message: AegisMessage | null;
+interface CypherGuideProps {
+  message: CypherMessage | null;
   isVisible: boolean;
   onSkip?: () => void;
 }
 
-export function AegisGuide({ message, isVisible, onSkip }: AegisGuideProps) {
-  const [displayedMessage, setDisplayedMessage] = useState<AegisMessage | null>(null);
+export function CypherGuide({ message, isVisible, onSkip }: CypherGuideProps) {
+  const [displayedMessage, setDisplayedMessage] = useState<CypherMessage | null>(null);
   const [isTyping, setIsTyping] = useState(false);
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const [isPlaying, setIsPlaying] = useState(false);
@@ -108,10 +108,10 @@ export function AegisGuide({ message, isVisible, onSkip }: AegisGuideProps) {
       <Card className={`${getTypeStyles()} border-2 shadow-xl`}>
         <div className="p-4">
           <div className="flex items-start gap-3">
-            {/* Aegis Avatar */}
+            {/* Cypher Avatar */}
             <Avatar className="h-12 w-12 border-2 border-white/50 bg-gradient-to-br from-cyan-500 to-blue-600">
               <AvatarFallback className="text-sm font-bold text-white">
-                AG
+                CY
               </AvatarFallback>
             </Avatar>
 
@@ -120,7 +120,7 @@ export function AegisGuide({ message, isVisible, onSkip }: AegisGuideProps) {
               <div className="flex items-center gap-2 mb-1 justify-between">
                 <div className="flex items-center gap-2">
                   <MessageCircle className="h-4 w-4" />
-                  <span className="font-bold text-sm">Aegis</span>
+                  <span className="font-bold text-sm">Cypher</span>
                   {isTyping && <span className="text-xs opacity-70">typing...</span>}
                 </div>
                 {displayedMessage.isBlocking && onSkip && (

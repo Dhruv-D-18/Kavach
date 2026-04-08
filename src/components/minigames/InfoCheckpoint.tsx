@@ -19,7 +19,7 @@ export function InfoCheckpoint({ title, message, onComplete }: InfoCheckpointPro
           {title}
         </CardTitle>
         <CardDescription className="text-slate-400">
-          Aegis Intercept - Knowledge Module
+          Cypher Intercept - Knowledge Module
         </CardDescription>
       </CardHeader>
       

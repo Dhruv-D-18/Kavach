@@ -22,7 +22,7 @@ import {
 import { useUser } from "@/context/user-context";
 
 export default function Profile() {
-  const { user } = useUser();
+  const { user, profile } = useUser();
   
   // If user is not logged in, redirect to auth
   if (!user) {
@@ -56,7 +56,7 @@ export default function Profile() {
     { date: "1 week ago", title: "Completed Password Security Module", xp: 150 },
   ];
 
-  const progressPercent = (user.xp / (user.level * 500)) * 100;
+  const progressPercent = ((profile?.xp ?? 0) / ((profile?.level ?? 1) * 500)) * 100;
 
   return (
     <div className="min-h-screen bg-gradient-dark">
@@ -69,13 +69,13 @@ export default function Profile() {
             <Avatar className="h-32 w-32 border-4 border-primary/30">
               <AvatarImage src="/kavach_logo.png" />
               <AvatarFallback className="bg-primary/20 text-primary text-3xl font-bold">
-                {user.username.substring(0, 2).toUpperCase()}
+                {(profile?.username ?? "Agent").substring(0, 2).toUpperCase()}
               </AvatarFallback>
             </Avatar>
 
             <div className="flex-1 text-center md:text-left">
               <h1 className="text-4xl font-bold text-gradient mb-2">
-                {user.username}
+                {profile?.username ?? "Agent"}
               </h1>
               <p className="text-muted-foreground mb-4 flex items-center justify-center md:justify-start gap-2">
                 <Mail className="h-4 w-4" />
@@ -97,8 +97,8 @@ export default function Profile() {
 
               <div className="mt-4">
                 <div className="flex items-center justify-between mb-2">
-                  <span className="text-sm text-muted-foreground">Progress to Level {user.level + 1}</span>
-                  <span className="text-sm font-medium text-primary">{user.xp} / {user.level * 500} XP</span>
+                  <span className="text-sm text-muted-foreground">Progress to Level {(profile?.level ?? 1) + 1}</span>
+                  <span className="text-sm font-medium text-primary">{profile?.xp ?? 0} / {(profile?.level ?? 1) * 500} XP</span>
                 </div>
                 <Progress value={progressPercent} className="h-2" />
               </div>
@@ -122,7 +122,7 @@ export default function Profile() {
             </CardHeader>
             <CardContent>
               <div className="text-2xl font-bold text-primary">
-                {user.score?.toLocaleString() || 0}
+                {(profile?.score ?? 0).toLocaleString()}
               </div>
             </CardContent>
           </Card>
@@ -136,7 +136,7 @@ export default function Profile() {
             </CardHeader>
             <CardContent>
               <div className="text-2xl font-bold text-primary">
-                {user.completedModules || 0}
+                0
               </div>
             </CardContent>
           </Card>
@@ -150,7 +150,7 @@ export default function Profile() {
             </CardHeader>
             <CardContent>
               <div className="text-2xl font-bold text-primary">
-                {user.streak || 0} 🔥
+                0 🔥
               </div>
             </CardContent>
           </Card>
@@ -164,7 +164,7 @@ export default function Profile() {
             </CardHeader>
             <CardContent>
               <div className="text-2xl font-bold text-primary">
-                Level {user.level}
+                Level {profile?.level ?? 1}
               </div>
             </CardContent>
           </Card>
@@ -187,7 +187,7 @@ export default function Profile() {
                 <div className="text-center py-8">
                   <Shield className="h-16 w-16 text-primary mx-auto mb-4" />
                   <h3 className="text-xl font-bold text-foreground mb-2">Crack the Vault Module</h3>
-                  <p className="text-muted-foreground mb-4">You've completed the password security module with a score of {user.score || 0} points.</p>
+                  <p className="text-muted-foreground mb-4">You've completed the password security module with a score of {profile?.score ?? 0} points.</p>
                   <Button onClick={() => window.location.href = '/modules/2'}>
                     Practice Again
                   </Button>
@@ -207,7 +207,7 @@ export default function Profile() {
                   <Label htmlFor="username">Username</Label>
                   <Input 
                     id="username" 
-                    defaultValue={user.username}
+                    defaultValue={profile?.username ?? ""}
                     className="bg-background/50 border-border/50"
                   />
                 </div>
@@ -217,7 +217,7 @@ export default function Profile() {
                   <Input 
                     id="email" 
                     type="email"
-                    defaultValue={user.email}
+                    defaultValue={user.email ?? ""}
                     className="bg-background/50 border-border/50"
                   />
                 </div>

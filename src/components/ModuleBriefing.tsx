@@ -39,7 +39,7 @@ export function ModuleBriefing({ moduleName, onAccept }: ModuleBriefingProps) {
               </h3>
               <p className="text-blue-100 leading-relaxed">
                 Welcome, recruit! In this mission, you'll learn the art of password security by attempting to crack a digital vault. 
-                Your guide, Aegis, will walk you through creating unbreakable passwords and understanding what makes them secure.
+                Your guide, Cypher, will walk you through creating unbreakable passwords and understanding what makes them secure.
               </p>
             </div>
 

@@ -1,279 +1,194 @@
 "use client";
 
 import { createContext, useContext, useState, useEffect, ReactNode } from "react";
-
-interface User {
-  id: string;
-  username: string;
-  email: string;
-  score: number;
-  level: number;
-  xp: number;
-  rank?: number;
-  totalUsers?: number;
-  completedModules?: number;
-  totalModules?: number;
-  streak?: number;
-}
-
-// In a real application, these would be API calls to your backend
-// For this prototype, we're using localStorage
-
-interface ApiUser {
-  id: string;
-  username: string;
-  email: string;
-  score: number;
-  level: number;
-  xp: number;
-}
+import { supabase } from "@/lib/supabase";
+import type { Profile } from "@/lib/supabase";
+import type { User as SupabaseUser } from "@supabase/supabase-js";
 
 interface UserContextType {
-  user: User | null;
-  login: (email: string, password: string) => boolean;
-  signup: (username: string, email: string, password: string) => boolean;
-  logout: () => void;
-  updateScore: (points: number) => void;
-  updateLevel: (newLevel: number) => void;
+  user: SupabaseUser | null;
+  profile: Profile | null;
+  isLoading: boolean;
+  login: (email: string, password: string) => Promise<{ success: boolean; error?: string }>;
+  signup: (username: string, email: string, password: string) => Promise<{ success: boolean; error?: string; sessionCreated?: boolean }>;
+  logout: () => Promise<void>;
+  updateScore: (points: number) => Promise<void>;
+  setAvatar: (avatar: 'male' | 'female') => Promise<void>;
+  completeTour: () => Promise<void>;
   isNewUser: boolean;
-  setIsNewUser: (isNew: boolean) => void;
   activeHoverTour: string | null;
   setActiveHoverTour: (id: string | null) => void;
+  seenDialogues: Set<string>;
+  markDialogueSeen: (id: string) => void;
 }
 
 const UserContext = createContext<UserContextType | undefined>(undefined);
 
 export function UserProvider({ children }: { children: ReactNode }) {
-  const [user, setUser] = useState<User | null>(null);
-  const [isNewUser, setIsNewUser] = useState<boolean>(false);
+  const [user, setUser] = useState<SupabaseUser | null>(null);
+  const [profile, setProfile] = useState<Profile | null>(null);
+  const [isLoading, setIsLoading] = useState(true);
+  const [isNewUser, setIsNewUser] = useState(false);
   const [activeHoverTour, setActiveHoverTour] = useState<string | null>(null);
+  const [seenDialogues, setSeenDialogues] = useState<Set<string>>(new Set());
 
-  // Load user data from localStorage on initial load
-  useEffect(() => {
-    const savedUser = localStorage.getItem("kavachUser");
-    if (savedUser) {
-      setUser(JSON.parse(savedUser));
-    }
-  }, []);
+  // Fetch profile from Supabase
+  const fetchProfile = async (userId: string) => {
+    const { data, error } = await (supabase as any)
+      .from("profiles")
+      .select("*")
+      .eq("id", userId)
+      .single();
 
-  // Save user data to localStorage whenever it changes
-  useEffect(() => {
-    if (user) {
-      localStorage.setItem("kavachUser", JSON.stringify(user));
-    } else {
-      localStorage.removeItem("kavachUser");
-    }
-  }, [user]);
-
-  // In a real application, these would be API calls:
-  /*
-  const login = async (email: string, password: string): Promise<boolean> => {
-    try {
-      const response = await fetch('/api/users', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ action: 'login', email, password })
-      });
-      
-      const data = await response.json();
-      
-      if (response.ok) {
-        setUser(data.user);
-        return true;
-      }
-      return false;
-    } catch (error) {
-      console.error('Login error:', error);
-      return false;
+    if (!error && data) {
+      setProfile(data as Profile);
     }
   };
 
-  const signup = async (username: string, email: string, password: string): Promise<boolean> => {
-    try {
-      const response = await fetch('/api/users', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ action: 'signup', username, email, password })
-      });
-      
-      const data = await response.json();
-      
-      if (response.ok) {
-        setUser(data.user);
-        return true;
-      }
-      return false;
-    } catch (error) {
-      console.error('Signup error:', error);
-      return false;
+  // Load seen dialogues from localStorage (per user)
+  const loadSeenDialogues = (userId: string) => {
+    const stored = localStorage.getItem(`seenDialogues_${userId}`);
+    if (stored) {
+      setSeenDialogues(new Set(JSON.parse(stored)));
     }
+  };
+
+  // On mount: check existing session
+  useEffect(() => {
+    const initSession = async () => {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (session?.user) {
+        setUser(session.user);
+        await fetchProfile(session.user.id);
+        loadSeenDialogues(session.user.id);
+      }
+      setIsLoading(false);
+    };
+
+    initSession();
+
+    // Listen for auth state changes
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
+      if (session?.user) {
+        setUser(session.user);
+        await fetchProfile(session.user.id);
+        loadSeenDialogues(session.user.id);
+      } else {
+        setUser(null);
+        setProfile(null);
+        setSeenDialogues(new Set());
+      }
+    });
+
+    return () => subscription.unsubscribe();
+  }, []);
+
+  const login = async (email: string, password: string): Promise<{ success: boolean; error?: string }> => {
+    const { data, error } = await supabase.auth.signInWithPassword({ email, password });
+    if (error) return { success: false, error: error.message };
+    if (data.user) {
+      await fetchProfile(data.user.id);
+    }
+    return { success: true };
+  };
+
+  const signup = async (username: string, email: string, password: string): Promise<{ success: boolean; error?: string; sessionCreated?: boolean }> => {
+    const { data, error } = await supabase.auth.signUp({
+      email,
+      password,
+      options: {
+        data: { username } // passed to trigger via raw_user_meta_data
+      }
+    });
+
+    if (error) return { success: false, error: error.message };
+
+    // If email confirmation is disabled, a session is created immediately
+    if (data.session && data.user) {
+      await fetchProfile(data.user.id);
+      return { success: true, sessionCreated: true };
+    }
+
+    // Email confirmation required — no session yet
+    return { success: true, sessionCreated: false };
+  };
+
+  const logout = async () => {
+    await supabase.auth.signOut();
+    setUser(null);
+    setProfile(null);
   };
 
   const updateScore = async (points: number) => {
-    if (user) {
-      const newScore = user.score + points;
-      const newXp = user.xp + points;
-      
-      // Level up logic (every 500 XP)
-      let newLevel = user.level;
-      if (newXp >= user.level * 500) {
-        newLevel = user.level + 1;
-      }
-      
-      try {
-        const response = await fetch('/api/users', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ 
-            action: 'updateScore', 
-            userId: user.id,
-            score: newScore,
-            xp: newXp,
-            level: newLevel
-          })
-        });
-        
-        const data = await response.json();
-        
-        if (response.ok) {
-          setUser(data.user);
-        }
-      } catch (error) {
-        console.error('Update score error:', error);
-        // Fallback to local update
-        const updatedUser = {
-          ...user,
-          score: newScore,
-          xp: newXp,
-          level: newLevel
-        };
-        setUser(updatedUser);
-      }
+    if (!user || !profile) return;
+
+    const newScore = profile.score + points;
+    const newXp = profile.xp + points;
+    const newLevel = newXp >= profile.level * 500 ? profile.level + 1 : profile.level;
+
+    const { data, error } = await (supabase as any)
+      .from("profiles")
+      .update({ score: newScore, xp: newXp, level: newLevel, updated_at: new Date().toISOString() })
+      .eq("id", user.id)
+      .select()
+      .single();
+
+    if (!error && data) {
+      setProfile(data as Profile);
     }
   };
-  */
 
-  // For prototype, we'll use localStorage:
-  const login = (email: string, password: string): boolean => {
-    // In a real app, this would be an API call
-    // For prototype, we'll check localStorage
-    const users = JSON.parse(localStorage.getItem("kavachUsers") || "{}");
-    
-    if (users[email] && users[email].password === password) {
-      const userData = users[email];
-      setUser({
-        id: userData.id,
-        username: userData.username,
-        email,
-        score: userData.score || 0,
-        level: userData.level || 1,
-        xp: userData.xp || 0,
-        rank: userData.rank || 100,
-        totalUsers: userData.totalUsers || 1000,
-        completedModules: userData.completedModules || 0,
-        totalModules: userData.totalModules || 24,
-        streak: userData.streak || 0
-      });
-      return true;
+  const setAvatar = async (avatar: 'male' | 'female') => {
+    if (!user) return;
+    const { data, error } = await (supabase as any)
+      .from("profiles")
+      .update({ avatar, updated_at: new Date().toISOString() })
+      .eq("id", user.id)
+      .select()
+      .single();
+
+    if (!error && data) {
+      setProfile(data as Profile);
     }
-    return false;
   };
 
-  const signup = (username: string, email: string, password: string): boolean => {
-    // In a real app, this would be an API call
-    // For prototype, we'll store in localStorage
-    const users = JSON.parse(localStorage.getItem("kavachUsers") || "{}");
-    
-    // Check if user already exists
-    if (users[email]) {
-      return false;
-    }
-    
-    // Create new user
-    const newUser = {
-      id: Math.random().toString(36).substring(2, 15),
-      username,
-      password,
-      score: 0,
-      level: 1,
-      xp: 0,
-      rank: 100,
-      totalUsers: 1000,
-      completedModules: 0,
-      totalModules: 24,
-      streak: 0
-    };
-    
-    users[email] = newUser;
-    localStorage.setItem("kavachUsers", JSON.stringify(users));
-    
-    setUser({
-      id: newUser.id,
-      username,
-      email,
-      score: 0,
-      level: 1,
-      xp: 0,
-      rank: 100,
-      totalUsers: 1000,
-      completedModules: 0,
-      totalModules: 24,
-      streak: 0
+  const completeTour = async () => {
+    if (!user) return;
+    await (supabase as any)
+      .from("profiles")
+      .update({ tour_completed: true, updated_at: new Date().toISOString() })
+      .eq("id", user.id);
+
+    setProfile(prev => prev ? { ...prev, tour_completed: true } : null);
+  };
+
+  const markDialogueSeen = (id: string) => {
+    setSeenDialogues(prev => {
+      const next = new Set(prev).add(id);
+      if (user) {
+        localStorage.setItem(`seenDialogues_${user.id}`, JSON.stringify([...next]));
+      }
+      return next;
     });
-    
-    return true;
   };
 
-  const logout = () => {
-    setUser(null);
-  };
-
-  const updateScore = (points: number) => {
-    if (user) {
-      const newScore = user.score + points;
-      const newXp = user.xp + points;
-      
-      // Level up logic (every 500 XP)
-      let newLevel = user.level;
-      if (newXp >= user.level * 500) {
-        newLevel = user.level + 1;
-      }
-      
-      const updatedUser = {
-        ...user,
-        score: newScore,
-        xp: newXp,
-        level: newLevel
-      };
-      
-      setUser(updatedUser);
-      
-      // Update in localStorage
-      const users = JSON.parse(localStorage.getItem("kavachUsers") || "{}");
-      if (users[user.email]) {
-        users[user.email].score = newScore;
-        users[user.email].xp = newXp;
-        users[user.email].level = newLevel;
-        localStorage.setItem("kavachUsers", JSON.stringify(users));
-      }
-    }
-  };
-
-  const updateLevel = (newLevel: number) => {
-    if (user) {
-      const updatedUser = { ...user, level: newLevel };
-      setUser(updatedUser);
-      
-      // Update in localStorage
-      const users = JSON.parse(localStorage.getItem("kavachUsers") || "{}");
-      if (users[user.email]) {
-        users[user.email].level = newLevel;
-        localStorage.setItem("kavachUsers", JSON.stringify(users));
-      }
-    }
-  };
   return (
-    <UserContext.Provider value={{ user, login, signup, logout, updateScore, updateLevel, isNewUser, setIsNewUser, activeHoverTour, setActiveHoverTour }}>
+    <UserContext.Provider value={{
+      user,
+      profile,
+      isLoading,
+      login,
+      signup,
+      logout,
+      updateScore,
+      setAvatar,
+      completeTour,
+      isNewUser,
+      activeHoverTour,
+      setActiveHoverTour,
+      seenDialogues,
+      markDialogueSeen,
+    }}>
       {children}
     </UserContext.Provider>
   );

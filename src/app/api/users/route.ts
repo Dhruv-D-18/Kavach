@@ -15,7 +15,8 @@ interface User {
 }
 
 // Mock database
-let users: User[] = [];
+const users: User[] = [];
+
 
 export async function POST(request: NextRequest) {
   try {

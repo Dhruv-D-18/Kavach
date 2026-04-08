@@ -2,16 +2,17 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Shield, Home, BookOpen, Trophy, User, Settings } from "lucide-react";
+import { Home, BookOpen, Trophy, User } from "lucide-react";
 import { Button } from "./ui/button";
 import { cn } from "@/lib/utils";
 import { useUser } from "@/context/user-context";
 
 export const Navigation = () => {
   const pathname = usePathname();
-  const { user, logout } = useUser();
+  const { user, profile, logout } = useUser();
   
   const isActive = (path: string) => pathname === path;
+
   
   return (
     <nav className="fixed top-0 left-0 right-0 z-50 glass-card border-b border-primary/20">
@@ -66,19 +67,20 @@ export const Navigation = () => {
             {user ? (
               <>
                 <div className="flex items-center gap-2 text-sm">
-                  <span className="text-muted-foreground">Level {user.level}</span>
-                  <span className="font-bold text-primary">{user.xp} XP</span>
+                  <span className="text-lg">{profile?.avatar === "female" ? "👩‍💻" : "🧑‍💻"}</span>
+                  <span className="text-muted-foreground">Level {profile?.level ?? 1}</span>
+                  <span className="font-bold text-primary">{profile?.xp ?? 0} XP</span>
                 </div>
                 <Link href="/profile">
                   <Button variant="ghost" size="icon" className="text-sm">
                     <User className="w-5 h-5" />
                   </Button>
                 </Link>
-                <Button 
-                  variant="ghost" 
+                <Button
+                  variant="ghost"
                   className="text-sm"
-                  onClick={() => {
-                    logout();
+                  onClick={async () => {
+                    await logout();
                     window.location.href = '/';
                   }}
                 >

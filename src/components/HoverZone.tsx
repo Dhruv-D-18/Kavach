@@ -11,34 +11,29 @@ interface HoverZoneProps {
 }
 
 export function HoverZone({ children, tourId, className = "", delayMs = 600 }: HoverZoneProps) {
-  const { setActiveHoverTour, isNewUser } = useUser();
+  const { setActiveHoverTour, user, profile, seenDialogues } = useUser();
   const timerRef = useRef<NodeJS.Timeout | null>(null);
 
   const handleMouseEnter = () => {
-    // Only activate hover events if they are a new user
-    if (!isNewUser) return;
+    // Only activate hover events if logged in, tour not completed, and dialogue not already seen
+    if (!user) return;
+    if (profile?.tour_completed) return;
+    if (seenDialogues.has(tourId)) return;
 
-    if (timerRef.current) {
-      clearTimeout(timerRef.current);
-    }
-    
-    // Set a debounce timer
+    if (timerRef.current) clearTimeout(timerRef.current);
+
     timerRef.current = setTimeout(() => {
       setActiveHoverTour(tourId);
     }, delayMs);
   };
 
   const handleMouseLeave = () => {
-    if (!isNewUser) return;
-    
-    if (timerRef.current) {
-      clearTimeout(timerRef.current);
-    }
+    if (timerRef.current) clearTimeout(timerRef.current);
   };
 
   return (
-    <div 
-      className={className}
+    <div
+      className={`relative ${className}`}
       onMouseEnter={handleMouseEnter}
       onMouseLeave={handleMouseLeave}
     >

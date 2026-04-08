@@ -1,145 +1,209 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from "@/components/ui/card";
-import { ShieldAlert, ShieldCheck, Shield } from "lucide-react";
+import { ShieldAlert, ShieldCheck, Shield, Settings2, Hash, KeySquare } from "lucide-react";
+import { Slider } from "@/components/ui/slider";
 
 interface EntropyMinigameProps {
   onComplete: () => void;
 }
 
+const POOLS = [
+  { id: 1, name: "Numeric Only (0-9)", size: 10 },
+  { id: 2, name: "Lowercase Only (a-z)", size: 26 },
+  { id: 3, name: "Alphanumeric Mix", size: 62 },
+  { id: 4, name: "Full ASCII (w/ Symbols)", size: 94 }
+];
+
 export function EntropyMinigame({ onComplete }: EntropyMinigameProps) {
-  const [password, setPassword] = useState("P@ss");
-  const [availableBlocks, setAvailableBlocks] = useState([
-    { id: 'w0rd', text: 'w0rd', type: 'text' },
-    { id: 'symbol', text: '!', type: 'symbol' },
-    { id: 'horse', text: '_horse', type: 'text' },
-  ]);
-  const [crackTime, setCrackTime] = useState("2 seconds");
-  const [crackTimeUnit, setCrackTimeUnit] = useState("seconds");
-  const [crackTimeValue, setCrackTimeValue] = useState(2);
+  const [length, setLength] = useState(8);
+  const [poolIndex, setPoolIndex] = useState(1); // Default to Lowercase
+  
+  const [combinationsDisplay, setCombinationsDisplay] = useState("");
+  const [crackTimeDisplay, setCrackTimeDisplay] = useState("Instantly");
   const [isSuccess, setIsSuccess] = useState(false);
+  const targetYears = 100;
+  const audioRef = useRef<HTMLAudioElement | null>(null);
+  const interactionCount = useRef(0);
+  const playedProgress = useRef(false);
 
-  // Simple deterministic calc for educational purposes
+  const playAudio = (src: string) => {
+    if (audioRef.current) {
+      audioRef.current.pause();
+    }
+    audioRef.current = new Audio(src);
+    audioRef.current.play().catch(err => console.error("Audio playback failed:", err));
+  };
+
+  // Play intro on mount
   useEffect(() => {
-    let time = 2;
-    let unit = "seconds";
+    playAudio("/audio/entropy-intro.mp3");
+    return () => audioRef.current?.pause();
+  }, []);
+
+  // Success audio trigger
+  useEffect(() => {
+    if (isSuccess) {
+      playAudio("/audio/entropy-success.mp3");
+    }
+  }, [isSuccess]);
+
+  useEffect(() => {
+    const poolSize = POOLS[poolIndex].size;
+    // Calculate permutations: poolSize ^ length
+    // Using BigInt might be overkill, we can just use Math.pow and format it
+    const perms = Math.pow(poolSize, length);
     
-    if (password === "P@ss") {
-      time = 2;
-      unit = "seconds";
-    } else if (password === "P@ss!") {
-      time = 5;
-      unit = "minutes";
-    } else if (password === "P@ssw0rd") {
-      time = 3;
-      unit = "hours";
-    } else if (password === "P@ssw0rd!") {
-      time = 5;
-      unit = "days";
-    } else if (password.includes("_horse")) {
-      time = 4000;
-      unit = "years";
-    } else if (password.length > 8) {
-      time = 100;
-      unit = "years";
+    // Format permutations
+    if (perms > 1e15) {
+      setCombinationsDisplay(`${(perms / 1e15).toFixed(2)} Quadrillion`);
+    } else if (perms > 1e12) {
+      setCombinationsDisplay(`${(perms / 1e12).toFixed(2)} Trillion`);
+    } else if (perms > 1e9) {
+      setCombinationsDisplay(`${(perms / 1e9).toFixed(2)} Billion`);
+    } else if (perms > 1e6) {
+      setCombinationsDisplay(`${(perms / 1e6).toFixed(2)} Million`);
+    } else {
+      setCombinationsDisplay(perms.toLocaleString());
     }
 
-    setCrackTime(`${time} ${unit}`);
-    setCrackTimeUnit(unit);
-    setCrackTimeValue(time);
+    // Modern offline hacker rig tests ~100 Billion hashes per second
+    const hashesPerSecond = 100_000_000_000;
+    const secondsToCrack = perms / hashesPerSecond;
+    const minutes = secondsToCrack / 60;
+    const hours = minutes / 60;
+    const days = hours / 24;
+    const years = days / 365.25;
 
-    if (unit === "years" && time >= 100) {
+    let timeStr = "";
+    if (secondsToCrack < 1) timeStr = "Instantly";
+    else if (secondsToCrack < 60) timeStr = `${Math.floor(secondsToCrack)} Seconds`;
+    else if (minutes < 60) timeStr = `${Math.floor(minutes)} Minutes`;
+    else if (hours < 24) timeStr = `${Math.floor(hours)} Hours`;
+    else if (days < 365) timeStr = `${Math.floor(days)} Days`;
+    else if (years < 1000) timeStr = `${Math.floor(years)} Years`;
+    else if (years < 1000000) timeStr = `${Math.floor(years / 1000)} Millennia`;
+    else timeStr = "Eternity";
+
+    setCrackTimeDisplay(timeStr);
+
+    if (years >= targetYears) {
       setIsSuccess(true);
+    } else {
+      setIsSuccess(false);
     }
-  }, [password]);
 
-  const handleAddBlock = (block: { id: string, text: string }) => {
-    setPassword(prev => prev + block.text);
-    setAvailableBlocks(prev => prev.filter(b => b.id !== block.id));
-  };
-
-  const handleReset = () => {
-    setPassword("P@ss");
-    setAvailableBlocks([
-      { id: 'w0rd', text: 'w0rd', type: 'text' },
-      { id: 'symbol', text: '!', type: 'symbol' },
-      { id: 'horse', text: '_horse', type: 'text' },
-    ]);
-    setIsSuccess(false);
-  };
+  }, [length, poolIndex]);
 
   return (
-    <Card className="w-full max-w-lg bg-slate-900 border-cyan-500 shadow-2xl shadow-cyan-500/20 text-slate-100">
+    <Card className="w-full max-w-2xl bg-slate-900 border-cyan-500 shadow-2xl shadow-cyan-500/20 text-slate-100">
       <CardHeader>
         <CardTitle className="text-2xl text-cyan-400 flex items-center gap-2">
-          <Shield className="h-6 w-6" />
-          The Entropy Builder
+          <Settings2 className="h-6 w-6" />
+          Entropy Configurator
         </CardTitle>
-        <CardDescription className="text-slate-400">
-          Aegis: "Increase the entropy (randomness and length) of this password to make it uncrackable. Aim for over 100 years!"
+        <CardDescription className="text-slate-400 mt-2">
+          Cypher: "Don't brute force the password directly. Instead, design the algorithm parameters. Tweak the character pool and string length to create mathematical entropy capable of withstanding 100 years of automated hacking."
         </CardDescription>
       </CardHeader>
-      <CardContent className="space-y-6">
+      <CardContent className="space-y-8">
         
-        {/* Password Display */}
-        <div className="bg-black/50 p-6 rounded-lg border border-slate-700 text-center">
-          <div className="text-3xl font-mono tracking-widest text-white mb-4">
-            {password}
-            <span className="animate-pulse">_</span>
-          </div>
+        {/* Sliders Area */}
+        <div className="space-y-8">
           
-          <div className={`p-3 rounded flex items-center justify-center gap-2 font-bold ${
-            crackTimeUnit === "years" ? 'bg-green-500/20 text-green-400' : 'bg-red-500/20 text-red-400'
-          }`}>
-            {crackTimeUnit === "years" ? <ShieldCheck className="h-5 w-5" /> : <ShieldAlert className="h-5 w-5" />}
-            Time to hack: {crackTime}
+          <div className="space-y-4">
+            <div className="flex justify-between items-center text-sm font-bold tracking-widest text-slate-300">
+              <span className="flex items-center gap-2"><KeySquare className="h-4 w-4 text-purple-400" /> CHARACTER POOL</span>
+              <span className="text-purple-400">{POOLS[poolIndex].name} ({POOLS[poolIndex].size} chars)</span>
+            </div>
+            <Slider 
+              value={[poolIndex]} 
+              min={0} 
+              max={3} 
+              step={1}
+              onValueChange={(v) => {
+                if(!isSuccess) {
+                  setPoolIndex(v[0]);
+                  interactionCount.current++;
+                  if (interactionCount.current >= 3 && !playedProgress.current) {
+                    playAudio("/audio/entropy-progress.mp3");
+                    playedProgress.current = true;
+                  }
+                }
+              }}
+              className="[&_[role=slider]]:bg-purple-500 [&_[role=slider]]:border-purple-300 [&>.relative>.absolute]:bg-purple-600 cursor-pointer"
+            />
+          </div>
+
+          <div className="space-y-4">
+            <div className="flex justify-between items-center text-sm font-bold tracking-widest text-slate-300">
+              <span className="flex items-center gap-2"><Hash className="h-4 w-4 text-cyan-400" /> STRING LENGTH</span>
+              <span className="text-cyan-400">{length} characters</span>
+            </div>
+            <Slider 
+              value={[length]} 
+              min={4} 
+              max={24} 
+              step={1}
+              onValueChange={(v) => {
+                if(!isSuccess) {
+                  setLength(v[0]);
+                  interactionCount.current++;
+                  if (interactionCount.current >= 3 && !playedProgress.current) {
+                    playAudio("/audio/entropy-progress.mp3");
+                    playedProgress.current = true;
+                  }
+                }
+              }}
+              className="[&_[role=slider]]:bg-cyan-500 [&_[role=slider]]:border-cyan-300 [&>.relative>.absolute]:bg-cyan-600 transform-gpu cursor-pointer"
+            />
+          </div>
+
+        </div>
+
+        {/* Real-time Math Display */}
+        <div className="bg-black/80 p-6 rounded-lg border-2 border-slate-700 shadow-inner">
+          <div className="grid grid-cols-2 gap-4 divide-x divide-slate-800">
+            <div className="flex flex-col items-center justify-center space-y-1">
+              <span className="text-xs text-slate-500 font-bold uppercase tracking-widest">Total Permutations</span>
+              <span className="text-xl font-mono text-slate-200">{combinationsDisplay}</span>
+              <span className="text-[10px] text-slate-600 italic">Pool^Length</span>
+            </div>
+            <div className="flex flex-col items-center justify-center space-y-1">
+              <span className="text-xs text-slate-500 font-bold uppercase tracking-widest">Est. Crack Time</span>
+              <span className={`text-2xl font-black tracking-widest uppercase transition-colors duration-500 ${isSuccess ? 'text-green-500' : 'text-red-500'}`}>
+                {crackTimeDisplay}
+              </span>
+              <span className="text-[10px] text-slate-600 italic">@ 100B hashes/sec</span>
+            </div>
           </div>
         </div>
 
-        {/* Blocks Drawer */}
-        {!isSuccess && (
-          <div className="space-y-3">
-            <h3 className="text-sm font-medium text-slate-400 uppercase tracking-wider">Available Blocks</h3>
-            <div className="flex flex-wrap gap-3">
-              {availableBlocks.map(block => (
-                <Button
-                  key={block.id}
-                  variant="outline"
-                  onClick={() => handleAddBlock(block)}
-                  className="bg-slate-800 hover:bg-cyan-900 hover:text-cyan-100 border-slate-600 font-mono text-lg py-6"
-                >
-                  +{block.text}
-                </Button>
-              ))}
-              {availableBlocks.length === 0 && (
-                 <p className="text-sm text-slate-500 italic">No more blocks available.</p>
-              )}
-            </div>
-            <div className="flex justify-end pt-2">
-              <Button variant="ghost" onClick={handleReset} size="sm" className="text-slate-400 hover:text-white">
-                Reset
-              </Button>
-            </div>
+      </CardContent>
+
+      <CardFooter className={`border-t transition-colors duration-500 flex flex-col items-stretch p-6 ${isSuccess ? 'bg-green-950/30 border-green-500/30' : 'bg-slate-900 border-slate-800'}`}>
+        {isSuccess ? (
+          <div className="animate-in fade-in zoom-in duration-500">
+             <div className="flex items-center gap-3 text-green-400 mb-4 justify-center">
+                <ShieldCheck className="h-8 w-8 shrink-0" />
+                <div>
+                  <h4 className="font-bold text-lg">Mathematically Secure</h4>
+                  <p className="text-sm opacity-90 text-green-200">Excellent! By combining a wide character pool with substantial length, you generated exponential combinations. The brute-force bots have failed.</p>
+                </div>
+             </div>
+             <Button onClick={onComplete} className="w-full bg-cyan-600 hover:bg-cyan-500 text-white font-bold py-6 text-lg mt-2 shadow-lg shadow-cyan-900">
+               Accept Settings & Bypass Firewall
+             </Button>
+          </div>
+        ) : (
+          <div className="flex items-center justify-center gap-2 text-slate-500 animate-pulse">
+            <ShieldAlert className="w-5 h-5" />
+            <span className="text-sm font-semibold uppercase tracking-widest">System remains vulnerable... Target: &gt; 100 Years</span>
           </div>
         )}
-
-      </CardContent>
-      {isSuccess && (
-        <CardFooter className="bg-green-950/30 border-t border-green-500/30 flex flex-col items-stretch p-6 animate-in fade-in zoom-in duration-500">
-           <div className="flex items-center gap-3 text-green-400 mb-4">
-              <ShieldCheck className="h-8 w-8" />
-              <div>
-                <h4 className="font-bold">System Secured</h4>
-                <p className="text-sm opacity-90">Length adds massive entropy. A bot would need centuries to guess this.</p>
-              </div>
-           </div>
-           <Button onClick={onComplete} className="w-full bg-cyan-600 hover:bg-cyan-500 text-white font-bold py-6">
-             Disable Firewall & Continue
-           </Button>
-        </CardFooter>
-      )}
+      </CardFooter>
     </Card>
   );
 }

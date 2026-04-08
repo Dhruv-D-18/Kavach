@@ -6,6 +6,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { X, BookOpen, Lock, Trophy, BarChart3 } from "lucide-react";
+import { useEffect, useRef } from "react";
 
 interface Position {
   x: number;
@@ -19,6 +20,29 @@ interface GameModeModuleProps {
 export function GameModeModule({ onExit }: GameModeModuleProps) {
   const [activeStation, setActiveStation] = useState<string | null>(null);
   const [playerPos, setPlayerPos] = useState<Position>({ x: 4, y: 4 });
+  const audioRef = useRef<HTMLAudioElement | null>(null);
+
+  const playAudio = (src: string) => {
+    if (audioRef.current) {
+      audioRef.current.pause();
+    }
+    audioRef.current = new Audio(src);
+    audioRef.current.play().catch(err => console.error("Audio playback failed:", err));
+  };
+
+  // Play welcome on mount
+  useEffect(() => {
+    playAudio("/audio/hub-welcome.mp3");
+    return () => audioRef.current?.pause();
+  }, []);
+
+  // Update audio when activeStation changes
+  useEffect(() => {
+    if (activeStation === 'theory') playAudio("/audio/hub-theory-hover.mp3");
+    if (activeStation === 'password') playAudio("/audio/hub-terminal-hover.mp3");
+    if (activeStation === 'rewards') playAudio("/audio/hub-rewards-hover.mp3");
+    if (activeStation === 'stats') playAudio("/audio/hub-stats-hover.mp3");
+  }, [activeStation]);
 
   // Check if player is near a station
   const isNearStation = (stationX: number, stationY: number) => {
@@ -82,7 +106,7 @@ export function GameModeModule({ onExit }: GameModeModuleProps) {
                 </Button>
               </div>
               <p className="text-slate-300 mb-4">
-                Test your skills by creating strong passwords. Aegis will guide you!
+                Test your skills by creating strong passwords. Cypher will guide you!
               </p>
               <Button 
                 onClick={() => {/* Navigate to password challenge */}}

@@ -1,16 +1,26 @@
 "use client";
 
+import { useState } from "react";
 import { Navigation } from "@/components/Navigation";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
-import { Trophy, Target, Lock } from "lucide-react";
+import { Trophy, Target, Lock, UserCircle } from "lucide-react";
 import { NavLink } from "@/components/NavLink";
 import { useUser } from "@/context/user-context";
 
 export default function Dashboard() {
-  const { user } = useUser();
-  
+  const { user, profile, setAvatar } = useUser();
+  const [selectedAvatar, setSelectedAvatar] = useState<"male" | "female" | null>(null);
+  const [avatarLoading, setAvatarLoading] = useState(false);
+
+  const handleAvatarConfirm = async () => {
+    if (!selectedAvatar) return;
+    setAvatarLoading(true);
+    await setAvatar(selectedAvatar);
+    setAvatarLoading(false);
+  };
+
   // If user is not logged in, redirect to auth
   if (!user) {
     // In a real app, we would redirect, but for now we'll show a message
@@ -29,18 +39,75 @@ export default function Dashboard() {
   }
   
   // Calculate xpToNext based on level (500 XP per level)
-  const xpToNext = user.level * 500;
-  const progressPercent = (user.xp / xpToNext) * 100;
+  const xpToNext = (profile?.level ?? 1) * 500;
+  const progressPercent = ((profile?.xp ?? 0) / xpToNext) * 100;
 
   return (
     <div className="min-h-screen bg-gradient-dark">
       <Navigation />
-      
+
+      {/* Avatar Selection Overlay — shown for brand-new users on first login */}
+      {user && profile && !profile.tour_completed && profile.avatar === "male" && (
+        <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center px-4">
+          <div className="glass-card cyber-border rounded-3xl p-10 text-center max-w-lg w-full">
+            <div className="inline-flex items-center justify-center w-16 h-16 mb-4 cyber-border rounded-2xl bg-primary/10">
+              <UserCircle className="w-8 h-8 text-primary" />
+            </div>
+            <h1 className="text-3xl font-bold mb-2">Welcome, Agent!</h1>
+            <p className="text-muted-foreground mb-8">Choose your identity. Cypher will address you accordingly.</p>
+
+            <div className="grid grid-cols-2 gap-6 mb-8">
+              <button
+                onClick={() => setSelectedAvatar("male")}
+                className={`relative rounded-2xl p-6 border-2 transition-all duration-300 cursor-pointer ${
+                  selectedAvatar === "male"
+                    ? "border-cyan-500 bg-cyan-500/10 shadow-[0_0_20px_rgba(6,182,212,0.3)]"
+                    : "border-slate-700 bg-slate-900/50 hover:border-cyan-500/50"
+                }`}
+              >
+                <div className="text-6xl mb-3">🧑‍💻</div>
+                <div className={`font-bold text-lg ${selectedAvatar === "male" ? "text-cyan-400" : "text-slate-300"}`}>Male Agent</div>
+                {selectedAvatar === "male" && (
+                  <div className="absolute top-3 right-3 w-5 h-5 bg-cyan-500 rounded-full flex items-center justify-center">
+                    <span className="text-white text-xs font-bold">✓</span>
+                  </div>
+                )}
+              </button>
+
+              <button
+                onClick={() => setSelectedAvatar("female")}
+                className={`relative rounded-2xl p-6 border-2 transition-all duration-300 cursor-pointer ${
+                  selectedAvatar === "female"
+                    ? "border-pink-500 bg-pink-500/10 shadow-[0_0_20px_rgba(236,72,153,0.3)]"
+                    : "border-slate-700 bg-slate-900/50 hover:border-pink-500/50"
+                }`}
+              >
+                <div className="text-6xl mb-3">👩‍💻</div>
+                <div className={`font-bold text-lg ${selectedAvatar === "female" ? "text-pink-400" : "text-slate-300"}`}>Female Agent</div>
+                {selectedAvatar === "female" && (
+                  <div className="absolute top-3 right-3 w-5 h-5 bg-pink-500 rounded-full flex items-center justify-center">
+                    <span className="text-white text-xs font-bold">✓</span>
+                  </div>
+                )}
+              </button>
+            </div>
+
+            <Button
+              onClick={handleAvatarConfirm}
+              disabled={!selectedAvatar || avatarLoading}
+              className="w-full h-12 gradient-primary text-lg font-semibold"
+            >
+              {avatarLoading ? "Saving..." : "Enter the Academy"}
+            </Button>
+          </div>
+        </div>
+      )}
+
       <main className="container mx-auto px-4 py-8 mt-16">
         {/* Welcome Section */}
         <div className="mb-8">
           <h1 className="text-4xl font-bold text-gradient mb-2">
-            Welcome back, {user.username}!
+            Welcome back, {profile?.username ?? "Agent"}!
           </h1>
           <p className="text-muted-foreground">Continue your cybersecurity journey</p>
         </div>
@@ -55,9 +122,9 @@ export default function Dashboard() {
               <Trophy className="h-4 w-4 text-primary" />
             </CardHeader>
             <CardContent>
-              <div className="text-3xl font-bold text-primary">{user.level}</div>
+              <div className="text-3xl font-bold text-primary">{profile?.level ?? 1}</div>
               <p className="text-xs text-muted-foreground mt-1">
-                {user.xp} / {xpToNext} XP
+                {profile?.xp ?? 0} / {xpToNext} XP
               </p>
               <Progress value={progressPercent} className="mt-2 h-2" />
             </CardContent>
@@ -71,9 +138,9 @@ export default function Dashboard() {
               <Target className="h-4 w-4 text-primary" />
             </CardHeader>
             <CardContent>
-              <div className="text-3xl font-bold text-primary">#{user.rank || 100}</div>
+              <div className="text-3xl font-bold text-primary">#{profile?.score ?? 0}</div>
               <p className="text-xs text-muted-foreground mt-1">
-                out of {(user.totalUsers || 1000).toLocaleString()} users
+                Total Score
               </p>
             </CardContent>
           </Card>
@@ -103,7 +170,7 @@ export default function Dashboard() {
               <Trophy className="h-4 w-4 text-primary" />
             </CardHeader>
             <CardContent>
-              <div className="text-3xl font-bold text-primary">{user.streak || 0}</div>
+              <div className="text-3xl font-bold text-primary">{profile?.level ?? 1}</div>
               <p className="text-xs text-muted-foreground mt-1">days in a row 🔥</p>
             </CardContent>
           </Card>

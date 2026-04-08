@@ -21,7 +21,7 @@ interface FirstTimeTourProps {
 const tourSteps: TourStep[] = [
   {
     title: "Welcome to Kavach Academy!",
-    description: "I'm Aegis, your cybersecurity mentor. Let me show you around this interactive learning platform where you'll master password security through hands-on missions.",
+    description: "I'm Cypher, your cybersecurity mentor. Let me show you around this interactive learning platform where you'll master password security through hands-on missions.",
     audioFile: "/audio/tour-step-0.mp3",
     highlight: "header"
   },
@@ -260,7 +260,7 @@ export function FirstTimeTour({ onComplete }: FirstTimeTourProps) {
               }}
             />
           ))}
-          <span className="text-cyan-400 text-xs ml-2 font-mono uppercase tracking-widest">Aegis Transmitting...</span>
+          <span className="text-cyan-400 text-xs ml-2 font-mono uppercase tracking-widest">Cypher Transmitting...</span>
         </div>
       )}
     </div>

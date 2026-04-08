@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import { EntropyMinigame } from "./minigames/EntropyMinigame";
 import { SocialEngineeringMinigame } from "./minigames/SocialEngineeringMinigame";
 import { HashingMinigame } from "./minigames/HashingMinigame";
@@ -36,6 +36,21 @@ export function SideScrollerLevel({ onReachVault, onComplete, onCheckpoint, isBl
   const [hasReachedVault, setHasReachedVault] = useState(false);
   const [triggeredCheckpoints, setTriggeredCheckpoints] = useState<Set<string>>(new Set());
   const [activeMinigame, setActiveMinigame] = useState<string | null>(null);
+  const audioRef = useRef<HTMLAudioElement | null>(null);
+
+  const playAudio = (src: string) => {
+    if (audioRef.current) {
+      audioRef.current.pause();
+    }
+    audioRef.current = new Audio(src);
+    audioRef.current.play().catch(err => console.error("Audio playback failed:", err));
+  };
+
+  // Play level start on mount
+  useEffect(() => {
+    playAudio("/audio/level-start.mp3");
+    return () => audioRef.current?.pause();
+  }, []);
 
   // Level dimensions
   const levelWidth = 1450; 
@@ -71,6 +86,8 @@ export function SideScrollerLevel({ onReachVault, onComplete, onCheckpoint, isBl
           // Block them slightly before the checkpoint until they solve/acknowledge it
           return { x: passedCheckpoint.x - 5, y: prev.y };
         }
+
+
       }
 
       return { x: newX, y: prev.y };

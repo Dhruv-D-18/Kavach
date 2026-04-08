@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { Navigation } from "@/components/Navigation";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -9,30 +9,33 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useUser } from "@/context/user-context";
-import { AegisGuide } from "@/components/AegisGuide";
+import { CypherGuide } from "@/components/CypherGuide";
 import { ModuleBriefing } from "@/components/ModuleBriefing";
 import { FirstTimeTour } from "@/components/FirstTimeTour";
 import { GameModeModule } from "@/components/GameModeModule";
 import { SideScrollerLevel } from "@/components/SideScrollerLevel";
 import {
   Lock,
-  Unlock,
-  Eye,
-  EyeOff,
-  Zap,
   Shield,
   Trophy,
   AlertTriangle,
   CheckCircle2,
-  XCircle
+  XCircle,
+  ArrowLeft,
+  BookOpen,
+  Star
 } from "lucide-react";
 import { useRouter } from "next/navigation";
 import zxcvbn from "zxcvbn";
-import { getAegisDialogue, getFirstTimeGuidance, getSuccessGuidance } from "@/lib/aegis-dialogues";
+import { getCypherDialogue, getFirstTimeGuidance, getSuccessGuidance } from "@/lib/cypher-dialogues";
 
 export default function CrackTheVault() {
   const router = useRouter();
-  const { user, updateScore } = useUser();
+  const { user, profile, updateScore, completeTour } = useUser();
+  const [showTour, setShowTour] = useState(false);
+  const [theoryCompleted, setTheoryCompleted] = useState(false);
+  const theoryAudioRef = useRef<HTMLAudioElement | null>(null);
+
   const [password, setPassword] = useState("");
   const [strength, setStrength] = useState(0);
   const [strengthLabel, setStrengthLabel] = useState("Very Weak");
@@ -45,15 +48,51 @@ export default function CrackTheVault() {
   const [unlocked, setUnlocked] = useState(false);
   const [attempts, setAttempts] = useState(0);
 
-  // Aegis guidance system
-  const [aegisMessage, setAegisMessage] = useState<{ text: string; type: "info" | "warning" | "success" | "tip"; audioFile?: string; isBlocking?: boolean } | null>(null);
-  const [showAegis, setShowAegis] = useState(true);
+  // Cypher guidance system
+  const [cypherMessage, setCypherMessage] = useState<{ text: string; type: "info" | "warning" | "success" | "tip"; audioFile?: string; isBlocking?: boolean } | null>(null);
+  const [showCypher, setShowCypher] = useState(true);
   const [gameState, setGameState] = useState<"scrolling" | "vault">("scrolling");
   const [isBlocked, setIsBlocked] = useState(false);
 
+  // Auth guard — redirect if not logged in
+  useEffect(() => {
+    if (!user) {
+      router.push("/auth");
+    }
+  }, [user, router]);
+
+  // Show first-time tour if user hasn't completed it
+  useEffect(() => {
+    if (profile && !profile.tour_completed) {
+      setShowTour(true);
+    }
+  }, [profile]);
+
+  const handleTourComplete = async () => {
+    setShowTour(false);
+    await completeTour();
+  };
+
+  const handleTheoryComplete = () => {
+    if (theoryCompleted) return;
+    setTheoryCompleted(true);
+    updateScore(100); // 100 XP for reading the theory
+    // Play reward audio
+    if (typeof window !== "undefined") {
+      const audio = new Audio("/audio/hub-rewards-hover.mp3");
+      theoryAudioRef.current = audio;
+      audio.play().catch(() => {});
+    }
+    setCypherMessage({
+      text: "Excellent work, Agent! You've absorbed the foundational knowledge. Theory mastered — now let's put it into practice in the field!",
+      type: "success",
+      audioFile: "/audio/hub-theory-hover.mp3",
+    });
+  };
+
   const handleReachVault = () => {
     setGameState("vault");
-    setAegisMessage({
+    setCypherMessage({
       text: "You are now in Admin Mode. Secure this compromised vault by constructing a password payload strong enough to resist modern brute-force dictionaries. I'll provide real-time feedback as you type.",
       type: "info",
       audioFile: "/audio/vault-reached.mp3",
@@ -61,12 +100,12 @@ export default function CrackTheVault() {
   };
 
   const handleCheckpoint = (id: string) => {
-    // SideScrollerLevel now handles info blocks internally. No Aegis dialogue needed.
+    // SideScrollerLevel now handles info blocks internally. No Cypher dialogue needed.
   };
 
   const handleSkipGuide = () => {
     setIsBlocked(false);
-    setAegisMessage(null);
+    setCypherMessage(null);
   };
 
   // Password strength evaluation logic using zxcvbn
@@ -142,11 +181,11 @@ export default function CrackTheVault() {
       setCrackTime("Instantly");
       setFeedback([]);
       setDictionaryWords([]);
-      setAegisMessage(null);
+      setCypherMessage(null);
     }
   }, [password]);
 
-  // Only trigger voice/aegis dialogue on explicit check
+  // Only trigger voice/cypher dialogue on explicit check
   const handleCheckPassword = () => {
     if (!password) return;
 
@@ -155,7 +194,7 @@ export default function CrackTheVault() {
     const hasNumbers = /[0-9]/.test(password);
     const hasSymbols = /[^A-Za-z0-9]/.test(password);
 
-    const aegisDialogue = getAegisDialogue({
+    const cypherDialogue = getCypherDialogue({
       password,
       strength,
       dictionaryWords,
@@ -167,7 +206,7 @@ export default function CrackTheVault() {
       length: password.length
     });
 
-    setAegisMessage(aegisDialogue as any);
+    setCypherMessage(cypherDialogue as any);
   };
 
   // Handle password submission
@@ -197,9 +236,9 @@ export default function CrackTheVault() {
         updateScore(earnedXp);
       }
 
-      // Show success message from Aegis
+      // Show success message from Cypher
       const successMessage = getSuccessGuidance(earnedXp, attempts + 1);
-      setAegisMessage(successMessage as any);
+      setCypherMessage(successMessage as any);
     } else {
       // Partial XP for attempts
       const partialXp = Math.floor(earnedXp * 0.5);
@@ -262,8 +301,12 @@ export default function CrackTheVault() {
     <div className="min-h-screen bg-gradient-dark">
       <Navigation />
 
-      {/* Aegis Guide Component */}
-      <AegisGuide message={aegisMessage} isVisible={showAegis} onSkip={handleSkipGuide} />
+      {/* First-Time Tour Overlay */}
+      {showTour && <FirstTimeTour onComplete={handleTourComplete} />}
+
+      {/* Cypher Guide Component */}
+      <CypherGuide message={cypherMessage} isVisible={showCypher} onSkip={handleSkipGuide} />
+
 
       <main className="container mx-auto px-4 py-8 mt-16">
         {/* Header */}
@@ -460,8 +503,33 @@ export default function CrackTheVault() {
                           </div>
                         </div>
                       </div>
+
+                      {/* Theory Complete CTA */}
+                      <div className="mt-6 p-5 rounded-xl bg-gradient-to-r from-cyan-500/10 to-blue-500/10 border border-cyan-500/30 flex items-center justify-between">
+                        <div className="flex items-center gap-3">
+                          {theoryCompleted
+                            ? <Star className="w-6 h-6 text-yellow-400 fill-yellow-400" />
+                            : <BookOpen className="w-6 h-6 text-cyan-400" />}
+                          <div>
+                            <p className="font-bold text-sm text-foreground">
+                              {theoryCompleted ? "Theory Mastered!" : "Done reading?"}
+                            </p>
+                            <p className="text-xs text-muted-foreground">
+                              {theoryCompleted ? "+100 XP awarded" : "Mark complete to earn 100 XP"}
+                            </p>
+                          </div>
+                        </div>
+                        <Button
+                          onClick={handleTheoryComplete}
+                          disabled={theoryCompleted}
+                          className={`${theoryCompleted ? "bg-green-600/20 text-green-400 border border-green-500/30" : "gradient-primary"} font-bold px-6`}
+                        >
+                          {theoryCompleted ? "✓ Completed" : "Mark as Complete"}
+                        </Button>
+                      </div>
                     </div>
                   </TabsContent>
+
                   <TabsContent value="practice" className="mt-0">
                     {gameState === "scrolling" ? (
                       <div className="space-y-4">

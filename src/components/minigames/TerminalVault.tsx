@@ -1,8 +1,9 @@
 "use client";
 
-import { useState, useRef, useEffect } from "react";
-import { Terminal, LockOpen } from "lucide-react";
+import { useState, useEffect, useRef } from "react";
 import { Button } from "@/components/ui/button";
+import { Card, CardContent } from "@/components/ui/card";
+import { Terminal, Shield, CheckCircle2, ChevronRight, Search, FileText, Zap } from "lucide-react";
 
 interface TerminalVaultProps {
   onComplete: () => void;
@@ -10,75 +11,89 @@ interface TerminalVaultProps {
 
 export function TerminalVault({ onComplete }: TerminalVaultProps) {
   const [history, setHistory] = useState<string[]>([
-    "KAVACH OS [Version 10.0.19045.2846]",
-    "(c) Kavach Corporation. All rights reserved.",
-    "",
-    "Establishing secure connection to Vault Server...",
-    "Connection Established. Root Access Required.",
-    "Type 'help' for available commands."
+    "KavachOS v2.4.1 (Admin Mode)",
+    "Type command or use the Toolkit to interact."
   ]);
   const [input, setInput] = useState("");
-  const [isHacking, setIsHacking] = useState(false);
   const [unlocked, setUnlocked] = useState(false);
+  const [isHacking, setIsHacking] = useState(false);
   
-  const bottomRef = useRef<HTMLDivElement>(null);
-  const inputRef = useRef<HTMLInputElement>(null);
+  // Progress state: 0=start, 1=osint done, 2=wordlist done, 3=cracked
+  const [step, setStep] = useState(0); 
 
-  // Auto-scroll to bottom of terminal
-  useEffect(() => {
-    bottomRef.current?.scrollIntoView({ behavior: "smooth" });
-  }, [history]);
+  const terminalRef = useRef<HTMLDivElement>(null);
+  const audioRef = useRef<HTMLAudioElement | null>(null);
 
-  // Focus input automatically
+  const playAudio = (src: string) => {
+    if (audioRef.current) {
+      audioRef.current.pause();
+    }
+    audioRef.current = new Audio(src);
+    audioRef.current.play().catch(err => console.error("Audio playback failed:", err));
+  };
+
+  // Play intro on mount
   useEffect(() => {
-    inputRef.current?.focus();
+    playAudio("/audio/vault-intro.mp3");
+    return () => {
+      audioRef.current?.pause();
+    };
   }, []);
 
-  const handleCommand = (cmd: string) => {
-    const rawCmd = cmd.trim();
-    const lowerCmd = rawCmd.toLowerCase();
-    
+  useEffect(() => {
+    if (terminalRef.current) {
+      terminalRef.current.scrollTop = terminalRef.current.scrollHeight;
+    }
+  }, [history]);
+
+  const handleCommand = (rawCmd: string) => {
+    const cmd = rawCmd.toLowerCase().trim();
     setHistory(prev => [...prev, `C:\\Hacker\\Tools> ${rawCmd}`]);
 
-    if (lowerCmd === "help") {
-      setHistory(prev => [...prev, 
-        "Available Commands:",
-        "  analyze target          - Run OSINT scan on the vault owner",
-        "  generate_wordlist       - Compile dictionary based on OSINT data",
-        "  crack_vault [list]      - Execute brute-force using specified wordlist",
-        "  clear                   - Clear screen"
-      ]);
-    } else if (lowerCmd === "clear") {
-      setHistory([
-        "KAVACH OS [Version 10.0.19045.2846]",
-        "(c) Kavach Corporation. All rights reserved."
-      ]);
-    } else if (lowerCmd === "analyze target") {
-      setHistory(prev => [...prev, 
-        "[!!] Initializing OSINT module...",
-        "Scanning public profiles... [OK]",
-        "Target Name: John Doe",
-        "Pet Name: Buster",
-        "Significant Year: 1985",
-        "Favorite Sports Team: Lakers"
-      ]);
-    } else if (lowerCmd === "generate_wordlist") {
-      setHistory(prev => [...prev, 
-        "[**] Analyzing parameters...",
-        "[**] Permutating strings (Buster, 1985, Lakers)...",
-        "[OK] Wordlist compiled successfully.",
-        "[OK] Saved as 'target_dict.txt'."
-      ]);
-    } else if (lowerCmd.startsWith("crack_vault")) {
-      if (!lowerCmd.includes("target_dict.txt") && !lowerCmd.includes("--wordlist")) {
-        setHistory(prev => [...prev, "[ERROR] Missing valid wordlist. Try 'crack_vault target_dict.txt'"]);
+    if (cmd === "analyze target") {
+      if (step >= 1) {
+        setHistory(prev => [...prev, "Target already analyzed."]);
       } else {
+        setHistory(prev => [...prev, "[*] Scraping public profile..."]);
+        playAudio("/audio/vault-osint.mp3");
+        
+        // Wait for Cypher to say "Data cached" (approx 2s)
+        setTimeout(() => {
+          setHistory(prev => [
+            ...prev, 
+            "Target Name: John Doe",
+            "Pet Name: <span class='text-yellow-400 font-bold'>Buster</span>",
+            "Significant Year: <span class='text-yellow-400 font-bold'>1985</span>",
+            "Favorite Sports Team: Lakers",
+            "[*] OSINT complete. Data cached."
+          ]);
+          setStep(1);
+        }, 2500);
+      }
+    } else if (cmd === "generate_wordlist") {
+      if (step === 0) {
+        setHistory(prev => [...prev, "[!] Cannot generate wordlist. No target data. Run 'analyze target' first."]);
+      } else if (step >= 2) {
+         setHistory(prev => [...prev, "Wordlist already generated."]);
+      } else {
+        playAudio("/audio/vault-dictionary.mp3");
+        setHistory(prev => [
+          ...prev,
+          "[*] Compiling dictionary based on OSINT...",
+          "[*] Applying common permutations (capitalization, special chars)...",
+          "[*] Generated 1.4 million potential combinations.",
+          "Saved to target_dict.txt"
+        ]);
+        setStep(2);
+      }
+    } else if (cmd === "crack_vault target_dict.txt" || cmd === "crack_vault") {
+      if (step < 2) {
+        setHistory(prev => [...prev, "[!] Error: require target_dict.txt. Generate wordlist first."]);
+      } else if (step === 2) {
         startHackingSequence();
       }
-    } else if (lowerCmd === "") {
-      // Do nothing, just empty prompt
     } else {
-      setHistory(prev => [...prev, `'${rawCmd}' is not recognized as an internal or external command.`]);
+      setHistory(prev => [...prev, `'${rawCmd}' is not recognized. Use the Hacker Toolkit commands.`]);
     }
     
     setInput("");
@@ -87,112 +102,198 @@ export function TerminalVault({ onComplete }: TerminalVaultProps) {
   const startHackingSequence = () => {
     setIsHacking(true);
     setHistory(prev => [...prev, "[**] INITIALIZING BRUTE FORCE ATTACK...", "Target: 192.168.1.1 (VAULT)"]);
+    playAudio("/audio/vault-bruteforce.mp3");
     
+    // Simulating generated wordlist combinations based on OSINT
+    const wordlistGuesses = [
+      "john123", "doejohn", "LakersFan", "1985john", "BusterDog",
+      "john1985", "lakers1985", "Buster123!", "LakersBuster", "doe1985",
+      "1985Lakers", "john_doe", "Buster!985", "BusterLakers", "JOHN1985",
+      "lakers_fan", "Buster1980", "1985buster", "Buster_1985"
+    ];
+
     let attempts = 0;
+    // We want the match to hit roughly when Cypher says "There... match found" 
+    // which is about 6 seconds into brute-force audio.
     const interval = setInterval(() => {
-      attempts++;
-      const randomJunk = Math.random().toString(36).substring(2, 12);
-      
-      if (attempts < 20) {
-        setHistory(prev => [...prev, `[FAIL] Testing password: ${randomJunk}... Access Denied`]);
+      if (attempts < wordlistGuesses.length) {
+        const guess = wordlistGuesses[attempts];
+        setHistory(prev => [...prev, `<span class='text-red-400'>[FAIL] Testing password: ${guess}... Denied</span>`]);
+        attempts++;
       } else {
         clearInterval(interval);
         setHistory(prev => [
           ...prev, 
-           "=========================================",
-          "[SUCCESS] MATCH FOUND: Buster1985",
-           "=========================================",
+           "<span class='text-green-400 font-bold'>=========================================</span>",
+          "<span class='text-green-400 font-bold'>[SUCCESS] MATCH FOUND: Buster1985</span>",
+           "<span class='text-green-400 font-bold'>=========================================</span>",
           "Access Granted. Disabling mainframe security locks."
         ]);
+        
         setTimeout(() => {
+          playAudio("/audio/vault-breached.mp3");
           setUnlocked(true);
+          setStep(3);
         }, 1500);
       }
-    }, 100); // Super fast scrolling
+    }, 300); // Slower interval so 20 attempts take ~6 seconds
   };
 
   const onSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!isHacking && !unlocked) {
+    if (!isHacking && !unlocked && input) {
       handleCommand(input);
     }
   };
 
+  const triggerToolkit = (cmd: string) => {
+    if (!isHacking && !unlocked) {
+      setInput(cmd);
+      handleCommand(cmd);
+    }
+  };
+
+  const getHint = () => {
+    if (step === 0) return "Cypher: Type 'analyze target' to scrape the profile.";
+    if (step === 1) return "Cypher: Type 'generate_wordlist' to build the dictionary.";
+    if (step === 2) return "Cypher: Type 'crack_vault target_dict.txt'";
+    return "";
+  };
+
   if (unlocked) {
     return (
-      <div className="w-full max-w-4xl bg-cyan-950 border-2 border-cyan-500 shadow-2xl shadow-cyan-500/50 rounded-lg p-10 text-center animate-in zoom-in duration-500">
-         <LockOpen className="h-24 w-24 text-cyan-400 mx-auto mb-6 animate-pulse" />
+      <div className="w-full max-w-4xl bg-slate-900 border-red-500 shadow-2xl shadow-red-500/20 text-center p-12 rounded-xl animate-in zoom-in duration-500">
+         <Shield className="w-24 h-24 text-red-500 mx-auto mb-6 animate-pulse" />
          <h2 className="text-4xl font-bold text-red-500 mb-4 tracking-widest">VAULT COMPROMISED</h2>
          <p className="text-cyan-200 text-lg mb-4">See how easy that was? The target's weak password 'Buster1985' was cracked instantly by your dictionary attack.</p>
          
          <div className="bg-black/40 p-5 rounded-lg border border-cyan-500/30 mb-8 max-w-2xl mx-auto text-left space-y-3">
            <div className="flex items-center gap-2 border-b border-cyan-500/20 pb-2">
-             <div className="w-8 h-8 rounded-full bg-cyan-600 flex items-center justify-center font-bold text-white text-xs">AG</div>
-             <p className="text-md font-bold text-cyan-400">Aegis Debrief & Protocol:</p>
+             <div className="w-8 h-8 rounded-full bg-cyan-600 flex items-center justify-center font-bold text-white text-xs">CY</div>
+             <p className="text-md font-bold text-cyan-400">Cypher Debrief & Protocol:</p>
            </div>
            <p className="text-sm text-cyan-100 italic">"What you just executed is a targeted Dictionary Attack.</p>
-           <p className="text-sm text-cyan-100 italic">By running OSINT (Open Source Intelligence), you scraped the target's pet name and birth year to generate a custom wordlist. The brute-force script instantly found the match."</p>
-           <p className="text-sm text-cyan-100 font-bold mt-2">Lesson: Never use personal details in your master passwords. You are now the System Admin. Secure this vault by constructing an unbreakable payload."</p>
+           <p className="text-sm text-cyan-100 italic">By running OSINT, you scraped the target's pet name and birth year to generate a custom wordlist. The brute-force script instantly found the match."</p>
+           <p className="text-sm text-yellow-400 font-bold mt-2">Lesson: Never use personal details in your master passwords.</p>
+           <p className="text-sm text-cyan-100 font-bold mt-2">You are now the System Admin. Secure this vault by constructing an unbreakable payload."</p>
          </div>
 
          <Button onClick={onComplete} size="lg" className="bg-cyan-600 hover:bg-cyan-500 text-white font-bold text-xl px-12 py-6">
            Enter Admin Mode
+         </Button>
+         <Button
+           onClick={() => window.location.href = '/dashboard'}
+           size="lg"
+           variant="outline"
+           className="mt-3 border-slate-600 text-slate-300 hover:border-cyan-500 hover:text-cyan-300 w-full"
+         >
+           ← Back to Dashboard
          </Button>
       </div>
     );
   }
 
   return (
-    <div className="w-full max-w-4xl h-[500px] bg-black border border-slate-700 shadow-2xl rounded-lg overflow-hidden flex flex-col font-mono text-sm leading-relaxed" style={{ boxShadow: "0 0 40px rgba(0, 255, 0, 0.1)" }}>
-      {/* Title Bar */}
-      <div className="bg-slate-900 border-b border-slate-800 px-4 py-2 flex items-center justify-between">
-        <div className="flex items-center gap-2 text-slate-400">
-          <Terminal className="h-4 w-4" />
-          <span>VAULT_SHELL_v2.1.exe</span>
-        </div>
-        
-        {/* Fake Window Controls */}
-        <div className="flex gap-2">
-          <div className="w-3 h-3 rounded-full bg-slate-600"></div>
-          <div className="w-3 h-3 rounded-full bg-slate-600"></div>
-          <div className="w-3 h-3 rounded-full bg-slate-600"></div>
-        </div>
+    <Card className="w-full max-w-5xl bg-slate-950 border-cyan-500 shadow-2xl shadow-cyan-500/20 grid grid-cols-1 md:grid-cols-3 overflow-hidden">
+      
+      {/* LEFT: Retro Terminal (2 Columns) */}
+      <div className="md:col-span-2 flex flex-col border-r border-slate-800">
+         <div className="bg-slate-900 border-b border-cyan-900/50 p-3 flex items-center gap-2">
+           <Terminal className="text-cyan-500 w-5 h-5" />
+           <span className="text-slate-300 font-mono text-sm">HackerTerminal_v2.exe</span>
+         </div>
+         
+         <div 
+           ref={terminalRef}
+           className="bg-black text-green-500 font-mono p-6 h-96 overflow-y-auto space-y-2 text-sm leading-relaxed"
+         >
+           {history.map((line, i) => (
+             <div key={i} dangerouslySetInnerHTML={{ __html: line }} />
+           ))}
+           {!isHacking && (
+             <form onSubmit={onSubmit} className="flex items-center gap-2 mt-4 text-green-400">
+               <span>C:\Hacker\Tools&gt;</span>
+               <input 
+                 autoFocus
+                 type="text" 
+                 value={input}
+                 onChange={(e) => setInput(e.target.value)}
+                 className="flex-1 bg-transparent outline-none border-none text-green-500"
+                 placeholder={getHint()}
+               />
+             </form>
+           )}
+           {isHacking && <div className="animate-pulse">_</div>}
+         </div>
       </div>
 
-      {/* Terminal Content Area */}
-      <div 
-        className="flex-1 p-4 overflow-y-auto text-green-500 relative"
-        style={{ 
-           textShadow: "0 0 5px rgba(0,255,0,0.5)",
-           backgroundImage: "linear-gradient(transparent 50%, rgba(0, 0, 0, 0.25) 50%)",
-           backgroundSize: "100% 4px" // CRT scanline effect
-        }}
-        onClick={() => inputRef.current?.focus()}
-      >
-        <div className="space-y-1 mb-4">
-          {history.map((line, i) => (
-            <div key={i}>{line}</div>
-          ))}
-        </div>
+      {/* RIGHT: Tracker & Toolkit (1 Column) */}
+      <div className="md:col-span-1 bg-slate-900 flex flex-col">
+         {/* Mission Tracker */}
+         <div className="p-6 border-b border-slate-800 flex-1">
+            <h3 className="text-cyan-400 font-bold uppercase tracking-widest text-sm mb-6 flex items-center gap-2">
+              Mission Tracker
+            </h3>
+            <ul className="space-y-6">
+               <li className={`flex items-start gap-3 transition-opacity ${step >= 0 ? 'opacity-100' : 'opacity-50'}`}>
+                 {step >= 1 ? <CheckCircle2 className="w-5 h-5 text-green-400 shrink-0" /> : <div className="w-5 h-5 border-2 border-cyan-600 rounded-full shrink-0" />}
+                 <div>
+                   <p className={`font-bold text-sm ${step >= 1 ? 'text-green-400' : 'text-slate-200'}`}>1. Run OSINT Scan</p>
+                   <p className="text-xs text-slate-500 mt-1">Gather intel on target.</p>
+                 </div>
+               </li>
+               <li className={`flex items-start gap-3 transition-opacity ${step >= 1 ? 'opacity-100' : 'opacity-50'}`}>
+                 {step >= 2 ? <CheckCircle2 className="w-5 h-5 text-green-400 shrink-0" /> : <div className="w-5 h-5 border-2 border-cyan-600 rounded-full shrink-0" />}
+                 <div>
+                   <p className={`font-bold text-sm ${step >= 2 ? 'text-green-400' : 'text-slate-200'}`}>2. Compile Dictionary</p>
+                   <p className="text-xs text-slate-500 mt-1">Build permutation wordlist.</p>
+                 </div>
+               </li>
+               <li className={`flex items-start gap-3 transition-opacity ${step >= 2 ? 'opacity-100' : 'opacity-50'}`}>
+                 {step >= 3 ? <CheckCircle2 className="w-5 h-5 text-green-400 shrink-0" /> : <div className="w-5 h-5 border-2 border-cyan-600 rounded-full shrink-0" />}
+                 <div>
+                   <p className={`font-bold text-sm ${step >= 3 ? 'text-green-400' : 'text-slate-200'}`}>3. Execute Brute-Force</p>
+                   <p className="text-xs text-slate-500 mt-1">Launch dictionary attack.</p>
+                 </div>
+               </li>
+            </ul>
+         </div>
 
-        {!isHacking && (
-          <form onSubmit={onSubmit} className="flex">
-            <span className="mr-2">C:\Hacker\Tools&gt;</span>
-            <input
-              ref={inputRef}
-              type="text"
-              value={input}
-              onChange={(e) => setInput(e.target.value)}
-              className="flex-1 bg-transparent border-none outline-none text-green-500 shadow-none"
-              autoComplete="off"
-              spellCheck="false"
-              autoFocus
-            />
-          </form>
-        )}
-        
-        <div ref={bottomRef} className="h-4"></div>
+         {/* Hacker Toolkit */}
+         <div className="p-6 bg-slate-950">
+            <h3 className="text-purple-400 font-bold uppercase tracking-widest text-xs mb-4">
+              Hacker Toolkit Quick-Actions
+            </h3>
+            <div className="space-y-3">
+              <Button 
+                variant="outline" 
+                onClick={() => triggerToolkit("analyze target")}
+                disabled={step !== 0 || isHacking}
+                className={`w-full justify-start text-xs border-slate-700 bg-slate-900 ${step === 0 ? 'text-cyan-400 border-cyan-500/50 hover:bg-cyan-900/30 hover:text-cyan-300' : 'text-slate-600'}`}
+              >
+                <Search className="w-4 h-4 mr-2" /> analyze target
+              </Button>
+              
+              <Button 
+                variant="outline" 
+                onClick={() => triggerToolkit("generate_wordlist")}
+                disabled={step !== 1 || isHacking}
+                className={`w-full justify-start text-xs border-slate-700 bg-slate-900 ${step === 1 ? 'text-cyan-400 border-cyan-500/50 hover:bg-cyan-900/30 hover:text-cyan-300' : 'text-slate-600'}`}
+              >
+                <FileText className="w-4 h-4 mr-2" /> generate_wordlist
+              </Button>
+
+              <Button 
+                variant="outline" 
+                onClick={() => triggerToolkit("crack_vault target_dict.txt")}
+                disabled={step !== 2 || isHacking}
+                className={`w-full justify-start text-xs border-slate-700 bg-slate-900 ${step === 2 ? 'text-cyan-400 border-cyan-500/50 hover:bg-cyan-900/30 hover:text-cyan-300' : 'text-slate-600'}`}
+              >
+                <Zap className="w-4 h-4 mr-2" /> crack_vault dict.txt
+              </Button>
+            </div>
+         </div>
       </div>
-    </div>
+    </Card>
   );
 }
