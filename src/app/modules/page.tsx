@@ -1,6 +1,6 @@
 import { Navigation } from "@/components/Navigation";
 import { Button } from "@/components/ui/button";
-import { Shield, Mail, Lock, AlertTriangle, MessageSquare, Flag, Target, ArrowRight } from "lucide-react";
+import { Shield, Lock, TriangleAlert, ArrowRight } from "lucide-react";
 import Link from "next/link";
 
 const modules = [
@@ -14,6 +14,17 @@ const modules = [
     xp: 400,
     color: "text-blue-400",
     bgColor: "bg-blue-400/10"
+  },
+  {
+    id: 3,
+    icon: TriangleAlert,
+    title: "Security Awareness Simulator",
+    description: "Face real-world cyber scenarios, make fast decisions, and learn how to avoid phishing, social engineering, unsafe devices, and public WiFi traps.",
+    level: "Easy → Hard",
+    duration: "15 min",
+    xp: 500,
+    color: "text-emerald-400",
+    bgColor: "bg-emerald-400/10"
   }
 ];
 
@@ -27,18 +38,18 @@ export default function Modules() {
           {/* Header */}
           <div className="text-center mb-12">
             <div className="inline-flex items-center justify-center w-16 h-16 mb-6 cyber-border rounded-2xl bg-primary/10">
-              <Lock className="w-8 h-8 text-primary" />
+              <Shield className="w-8 h-8 text-primary" />
             </div>
             <h1 className="text-5xl font-bold mb-4">
-              Crack the <span className="text-gradient">Vault</span>
+              Cyber <span className="text-gradient">Training Modules</span>
             </h1>
             <p className="text-xl text-muted-foreground max-w-2xl mx-auto">
-              Master cybersecurity by creating unbreakable passwords. Test your skills in this interactive password strength challenge!
+              Build practical cybersecurity instincts through interactive, mission-based learning modules.
             </p>
           </div>
           
           {/* Modules Grid */}
-          <div className="max-w-2xl mx-auto">
+          <div className="max-w-5xl mx-auto grid grid-cols-1 md:grid-cols-2 gap-6">
             {modules.map((module) => (
               <div key={module.id} className="glass-card cyber-border rounded-2xl p-6 hover:cyber-glow transition-all group">
                 <div className="text-center mb-6">

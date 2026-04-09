@@ -10,15 +10,20 @@ import { NavLink } from "@/components/NavLink";
 import { useUser } from "@/context/user-context";
 
 export default function Dashboard() {
-  const { user, profile, setAvatar } = useUser();
+  const { user, profile, setAvatar, completeTour } = useUser();
   const [selectedAvatar, setSelectedAvatar] = useState<"male" | "female" | null>(null);
   const [avatarLoading, setAvatarLoading] = useState(false);
 
   const handleAvatarConfirm = async () => {
     if (!selectedAvatar) return;
     setAvatarLoading(true);
-    await setAvatar(selectedAvatar);
-    setAvatarLoading(false);
+    try {
+      await setAvatar(selectedAvatar);
+      // Mark onboarding complete so modal closes for both male and female choices.
+      await completeTour();
+    } finally {
+      setAvatarLoading(false);
+    }
   };
 
   // If user is not logged in, redirect to auth
@@ -47,7 +52,7 @@ export default function Dashboard() {
       <Navigation />
 
       {/* Avatar Selection Overlay — shown for brand-new users on first login */}
-      {user && profile && !profile.tour_completed && profile.avatar === "male" && (
+      {user && profile && !profile.tour_completed && (
         <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center px-4">
           <div className="glass-card cyber-border rounded-3xl p-10 text-center max-w-lg w-full">
             <div className="inline-flex items-center justify-center w-16 h-16 mb-4 cyber-border rounded-2xl bg-primary/10">
