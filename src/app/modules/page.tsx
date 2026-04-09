@@ -1,6 +1,6 @@
 import { Navigation } from "@/components/Navigation";
 import { Button } from "@/components/ui/button";
-import { Shield, Mail, Lock, AlertTriangle, MessageSquare, Flag, Target, ArrowRight, Search } from "lucide-react";
+import { Shield, Lock, ArrowRight, Search, Radar } from "lucide-react";
 import Link from "next/link";
 
 const modules = [
@@ -25,6 +25,17 @@ const modules = [
     xp: 250,
     color: "text-purple-400",
     bgColor: "bg-purple-400/10"
+  },
+  {
+    id: 3,
+    icon: Radar,
+    title: "Operation Iron Wall",
+    description: "Defend Kavach Central Database in a live SOC stream. Intercept suspicious packets by analyzing source IP, port, and payload size under pressure.",
+    level: "Guardian",
+    duration: "18 min",
+    xp: 350,
+    color: "text-cyan-400",
+    bgColor: "bg-cyan-400/10"
   }
 ];
 
@@ -49,7 +60,7 @@ export default function Modules() {
           </div>
           
           {/* Modules Grid */}
-          <div className="grid md:grid-cols-2 gap-8 max-w-6xl mx-auto">
+          <div className="grid md:grid-cols-2 xl:grid-cols-3 gap-8 max-w-7xl mx-auto">
             {modules.map((module) => (
               <div key={module.id} className="flex flex-col h-full glass-card cyber-border rounded-2xl p-6 hover:cyber-glow transition-all group">
                 <div className="flex-grow text-center mb-6">
