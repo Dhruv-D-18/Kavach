@@ -1,11 +1,11 @@
 import { Navigation } from "@/components/Navigation";
 import { Button } from "@/components/ui/button";
-import { Shield, Mail, Lock, AlertTriangle, MessageSquare, Flag, Target, ArrowRight } from "lucide-react";
+import { Shield, Mail, Lock, AlertTriangle, MessageSquare, Flag, Target, ArrowRight, Search } from "lucide-react";
 import Link from "next/link";
 
 const modules = [
   {
-    id: 2,
+    id: 1,
     icon: Lock,
     title: "Crack the Vault",
     description: "Master password creation by understanding entropy, common patterns, and building unbreakable passwords. Test your skills in this interactive password strength challenge.",
@@ -14,6 +14,17 @@ const modules = [
     xp: 400,
     color: "text-blue-400",
     bgColor: "bg-blue-400/10"
+  },
+  {
+    id: 2,
+    icon: Search,
+    title: "The Phishing Catch",
+    description: "Analyze suspicious emails and websites. Use forensic tools like URL Sniffers and SSL X-Rays to identify red flags and block malicious threats.",
+    level: "Analyst",
+    duration: "15 min",
+    xp: 250,
+    color: "text-purple-400",
+    bgColor: "bg-purple-400/10"
   }
 ];
 
@@ -30,18 +41,18 @@ export default function Modules() {
               <Lock className="w-8 h-8 text-primary" />
             </div>
             <h1 className="text-5xl font-bold mb-4">
-              Crack the <span className="text-gradient">Vault</span>
+              Kavach Academy <span className="text-gradient">Training Modules</span>
             </h1>
             <p className="text-xl text-muted-foreground max-w-2xl mx-auto">
-              Master cybersecurity by creating unbreakable passwords. Test your skills in this interactive password strength challenge!
+              Master the art of cyber defense through high-fidelity simulations. Complete every operation to reach Guardian rank.
             </p>
           </div>
           
           {/* Modules Grid */}
-          <div className="max-w-2xl mx-auto">
+          <div className="grid md:grid-cols-2 gap-8 max-w-6xl mx-auto">
             {modules.map((module) => (
-              <div key={module.id} className="glass-card cyber-border rounded-2xl p-6 hover:cyber-glow transition-all group">
-                <div className="text-center mb-6">
+              <div key={module.id} className="flex flex-col h-full glass-card cyber-border rounded-2xl p-6 hover:cyber-glow transition-all group">
+                <div className="flex-grow text-center mb-6">
                   <div className={`inline-flex items-center justify-center w-16 h-16 mb-4 rounded-2xl ${module.bgColor} ${module.color}`}>
                     <module.icon className="w-8 h-8" />
                   </div>
@@ -55,21 +66,23 @@ export default function Modules() {
                   </p>
                 </div>
                 
-                <div className="flex flex-wrap items-center justify-center gap-4 mb-6 text-sm">
-                  <span className="px-3 py-1 rounded-full bg-primary/20 text-primary font-medium">
-                    {module.level}
-                  </span>
-                  <span className="text-muted-foreground">⏱️ {module.duration}</span>
-                  <span className="text-primary font-semibold">+{module.xp} XP</span>
-                </div>
-                
-                <div className="flex gap-3 justify-center">
-                  <Button className="gradient-primary font-semibold group-hover:shadow-lg transition-shadow px-8" asChild>
-                    <Link href={`/modules/${module.id}`}>
-                      Start Challenge
-                      <ArrowRight className="w-4 h-4 ml-2" />
-                    </Link>
-                  </Button>
+                <div className="mt-auto">
+                  <div className="flex flex-wrap items-center justify-center gap-4 mb-6 text-sm">
+                    <span className="px-3 py-1 rounded-full bg-primary/20 text-primary font-medium">
+                      {module.level}
+                    </span>
+                    <span className="text-muted-foreground">⏱️ {module.duration}</span>
+                    <span className="text-primary font-semibold">+{module.xp} XP</span>
+                  </div>
+                  
+                  <div className="flex gap-3 justify-center">
+                    <Button className="gradient-primary font-semibold group-hover:shadow-lg transition-shadow px-8" asChild>
+                      <Link href={`/modules/${module.id}`}>
+                        Start Challenge
+                        <ArrowRight className="w-4 h-4 ml-2" />
+                      </Link>
+                    </Button>
+                  </div>
                 </div>
               </div>
             ))}

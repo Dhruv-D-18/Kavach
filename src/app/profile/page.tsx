@@ -22,11 +22,22 @@ import {
 import { useUser } from "@/context/user-context";
 
 export default function Profile() {
-  const { user, profile } = useUser();
+  const { user, profile, isLoading } = useUser();
   
+  // Handle Loading Session
+  if (isLoading) {
+    return (
+      <div className="min-h-screen bg-gradient-dark flex items-center justify-center">
+        <div className="text-center space-y-4 font-mono">
+          <div className="w-16 h-16 border-t-2 border-b-2 border-cyan-500 rounded-full animate-spin mx-auto mb-4"></div>
+          <div className="text-cyan-500 tracking-[0.3em] uppercase text-xs animate-pulse">Establishing Secure ID Connection...</div>
+        </div>
+      </div>
+    );
+  }
+
   // If user is not logged in, redirect to auth
   if (!user) {
-    // In a real app, we would redirect, but for now we'll show a message
     return (
       <div className="min-h-screen bg-gradient-dark">
         <Navigation />
@@ -98,9 +109,9 @@ export default function Profile() {
               <div className="mt-4">
                 <div className="flex items-center justify-between mb-2">
                   <span className="text-sm text-muted-foreground">Progress to Level {(profile?.level ?? 1) + 1}</span>
-                  <span className="text-sm font-medium text-primary">{profile?.xp ?? 0} / {(profile?.level ?? 1) * 500} XP</span>
+                  <span className="text-sm font-medium text-primary">{(profile?.xp ?? 0) % 500} / 500 XP</span>
                 </div>
-                <Progress value={progressPercent} className="h-2" />
+                <Progress value={((profile?.xp ?? 0) % 500) / 5} className="h-2" />
               </div>
             </div>
 
@@ -188,7 +199,7 @@ export default function Profile() {
                   <Shield className="h-16 w-16 text-primary mx-auto mb-4" />
                   <h3 className="text-xl font-bold text-foreground mb-2">Crack the Vault Module</h3>
                   <p className="text-muted-foreground mb-4">You've completed the password security module with a score of {profile?.score ?? 0} points.</p>
-                  <Button onClick={() => window.location.href = '/modules/2'}>
+                  <Button onClick={() => window.location.href = '/modules/1'}>
                     Practice Again
                   </Button>
                 </div>

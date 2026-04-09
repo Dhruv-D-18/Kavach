@@ -68,8 +68,7 @@ export const Navigation = () => {
               <>
                 <div className="flex items-center gap-2 text-sm">
                   <span className="text-lg">{profile?.avatar === "female" ? "👩‍💻" : "🧑‍💻"}</span>
-                  <span className="text-muted-foreground">Level {profile?.level ?? 1}</span>
-                  <span className="font-bold text-primary">{profile?.xp ?? 0} XP</span>
+                  <span className="font-bold text-primary">Level {profile?.level ?? 1}</span>
                 </div>
                 <Link href="/profile">
                   <Button variant="ghost" size="icon" className="text-sm">

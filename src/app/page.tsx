@@ -22,7 +22,16 @@ export default function Home() {
   }
 
   // After boot, show loading state while session is being checked
-  if (isLoading) return null;
+  if (isLoading) {
+    return (
+      <div className="min-h-screen bg-gradient-dark flex items-center justify-center">
+        <div className="text-center space-y-4">
+          <Globe className="w-12 h-12 text-primary animate-pulse mx-auto" />
+          <div className="text-primary font-mono tracking-[0.2em] text-sm uppercase">Establishing Academy Link...</div>
+        </div>
+      </div>
+    );
+  }
 
   const handleProtectedLink = (path: string) => {
     if (!user) {
@@ -111,7 +120,7 @@ export default function Home() {
             <HoverZone tourId="crack-vault" className="h-full">
               <div
                 className="glass-card cyber-border p-6 rounded-2xl hover:cyber-glow transition-all h-full cursor-pointer group"
-                onClick={() => handleProtectedLink("/modules/2")}
+                onClick={() => handleProtectedLink("/modules/1")}
               >
                 <div className="inline-flex items-center justify-center w-12 h-12 mb-4 rounded-xl bg-primary/10 text-blue-400">
                   <Lock className="w-6 h-6" />

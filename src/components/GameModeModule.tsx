@@ -5,7 +5,7 @@ import { GameMap } from "@/components/GameMap";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { X, BookOpen, Lock, Trophy, BarChart3 } from "lucide-react";
+import { X, BookOpen, Lock, Trophy, BarChart3, ShieldAlert } from "lucide-react";
 import { useEffect, useRef } from "react";
 
 interface Position {
@@ -61,6 +61,8 @@ export function GameModeModule({ onExit }: GameModeModuleProps) {
       setActiveStation('rewards');
     } else if (isNearStation(6, 6) && !activeStation) {
       setActiveStation('stats');
+    } else if (isNearStation(1, 3) && !activeStation) {
+      setActiveStation('phishing');
     }
   };
 
@@ -109,7 +111,7 @@ export function GameModeModule({ onExit }: GameModeModuleProps) {
                 Test your skills by creating strong passwords. Cypher will guide you!
               </p>
               <Button 
-                onClick={() => {/* Navigate to password challenge */}}
+                onClick={() => window.location.href = '/modules/1'}
                 className="w-full bg-cyan-600 hover:bg-cyan-700"
               >
                 Start Password Challenge
@@ -139,6 +141,32 @@ export function GameModeModule({ onExit }: GameModeModuleProps) {
                 <Badge className="bg-blue-600">🔐 Password Master</Badge>
                 <Badge className="bg-purple-600">⭐ Quick Learner</Badge>
               </div>
+            </CardContent>
+          </Card>
+        );
+
+      case 'phishing':
+        return (
+          <Card className="max-w-2xl bg-slate-900/95 border-purple-500 shadow-lg shadow-purple-500/20">
+            <CardContent className="p-6">
+              <div className="flex items-center justify-between mb-4">
+                <div className="flex items-center gap-2">
+                  <ShieldAlert className="w-6 h-6 text-purple-400" />
+                  <h3 className="text-xl font-bold text-purple-300">Phishing Lab</h3>
+                </div>
+                <Button onClick={() => setActiveStation(null)} size="icon" variant="ghost">
+                  <X className="w-4 h-4" />
+                </Button>
+              </div>
+              <p className="text-slate-300 mb-4">
+                Analyze intercepted communications. Identify red flags using forensic tools.
+              </p>
+              <Button 
+                onClick={() => window.location.href = '/modules/2'}
+                className="w-full bg-purple-600 hover:bg-purple-700 font-bold"
+              >
+                Launch Operation: Intercept
+              </Button>
             </CardContent>
           </Card>
         );

@@ -10,20 +10,36 @@ import { NavLink } from "@/components/NavLink";
 import { useUser } from "@/context/user-context";
 
 export default function Dashboard() {
-  const { user, profile, setAvatar } = useUser();
+  const { user, profile, setAvatar, completeTour, isLoading } = useUser();
   const [selectedAvatar, setSelectedAvatar] = useState<"male" | "female" | null>(null);
   const [avatarLoading, setAvatarLoading] = useState(false);
 
   const handleAvatarConfirm = async () => {
     if (!selectedAvatar) return;
     setAvatarLoading(true);
-    await setAvatar(selectedAvatar);
-    setAvatarLoading(false);
+    try {
+      await setAvatar(selectedAvatar);
+      // Mark onboarding complete so modal closes for both male and female choices.
+      await completeTour();
+    } finally {
+      setAvatarLoading(false);
+    }
   };
+
+  // Handle Loading Session
+  if (isLoading) {
+    return (
+      <div className="min-h-screen bg-gradient-dark flex items-center justify-center">
+        <div className="text-center space-y-4 font-mono">
+          <div className="w-16 h-16 border-t-2 border-b-2 border-cyan-500 rounded-full animate-spin mx-auto mb-4"></div>
+          <div className="text-cyan-500 tracking-[0.3em] uppercase text-xs animate-pulse">Decrypting User Data...</div>
+        </div>
+      </div>
+    );
+  }
 
   // If user is not logged in, redirect to auth
   if (!user) {
-    // In a real app, we would redirect, but for now we'll show a message
     return (
       <div className="min-h-screen bg-gradient-dark">
         <Navigation />
@@ -39,15 +55,16 @@ export default function Dashboard() {
   }
   
   // Calculate xpToNext based on level (500 XP per level)
-  const xpToNext = (profile?.level ?? 1) * 500;
-  const progressPercent = ((profile?.xp ?? 0) / xpToNext) * 100;
+  const currentLevel = profile?.level ?? 1;
+  const xpInCurrentLevel = (profile?.xp ?? 0) % 500;
+  const progressPercent = (xpInCurrentLevel / 500) * 100;
 
   return (
     <div className="min-h-screen bg-gradient-dark">
       <Navigation />
 
       {/* Avatar Selection Overlay — shown for brand-new users on first login */}
-      {user && profile && !profile.tour_completed && profile.avatar === "male" && (
+      {user && profile && !profile.tour_completed && (
         <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center px-4">
           <div className="glass-card cyber-border rounded-3xl p-10 text-center max-w-lg w-full">
             <div className="inline-flex items-center justify-center w-16 h-16 mb-4 cyber-border rounded-2xl bg-primary/10">
@@ -122,9 +139,9 @@ export default function Dashboard() {
               <Trophy className="h-4 w-4 text-primary" />
             </CardHeader>
             <CardContent>
-              <div className="text-3xl font-bold text-primary">{profile?.level ?? 1}</div>
+              <div className="text-3xl font-bold text-primary">Level {profile?.level ?? 1}</div>
               <p className="text-xs text-muted-foreground mt-1">
-                {profile?.xp ?? 0} / {xpToNext} XP
+                {((profile?.level ?? 1) - 1) * 500} + {xpInCurrentLevel} = <span className="text-cyan-400 font-bold">{profile?.xp ?? 0} Total XP</span>
               </p>
               <Progress value={progressPercent} className="mt-2 h-2" />
             </CardContent>
@@ -190,7 +207,7 @@ export default function Dashboard() {
                   Practice creating strong passwords and learn about password security in this interactive module.
                 </p>
                 <Button asChild>
-                  <NavLink href="/modules/2">
+                  <NavLink href="/modules/1">
                     Start Module
                   </NavLink>
                 </Button>

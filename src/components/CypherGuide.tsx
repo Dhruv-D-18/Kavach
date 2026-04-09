@@ -16,9 +16,11 @@ interface CypherGuideProps {
   message: CypherMessage | null;
   isVisible: boolean;
   onSkip?: () => void;
+  onNext?: () => void;
+  isTour?: boolean;
 }
 
-export function CypherGuide({ message, isVisible, onSkip }: CypherGuideProps) {
+export function CypherGuide({ message, isVisible, onSkip, onNext, isTour }: CypherGuideProps) {
   const [displayedMessage, setDisplayedMessage] = useState<CypherMessage | null>(null);
   const [isTyping, setIsTyping] = useState(false);
   const audioRef = useRef<HTMLAudioElement | null>(null);
@@ -123,17 +125,33 @@ export function CypherGuide({ message, isVisible, onSkip }: CypherGuideProps) {
                   <span className="font-bold text-sm">Cypher</span>
                   {isTyping && <span className="text-xs opacity-70">typing...</span>}
                 </div>
-                {displayedMessage.isBlocking && onSkip && (
-                  <button 
-                    onClick={() => {
-                       if (audioRef.current) audioRef.current.pause();
-                       setIsPlaying(false);
-                       onSkip();
-                    }}
-                    className="text-xs bg-black/20 hover:bg-black/40 px-2 py-1 rounded border border-white/20 transition-colors"
-                  >
-                    Skip &gt;&gt;
-                  </button>
+                {displayedMessage.isBlocking && (onSkip || onNext) && (
+                  <div className="flex gap-2">
+                    {onNext && (
+                      <button 
+                        onClick={() => {
+                          if (audioRef.current) audioRef.current.pause();
+                          setIsPlaying(false);
+                          onNext();
+                        }}
+                        className="text-[10px] font-bold bg-cyan-500 hover:bg-cyan-400 text-cyan-950 px-2 py-1 rounded shadow-[0_0_10px_rgba(6,182,212,0.3)] transition-all animate-pulse"
+                      >
+                        NEXT &gt;&gt;
+                      </button>
+                    )}
+                    {onSkip && (
+                      <button 
+                        onClick={() => {
+                          if (audioRef.current) audioRef.current.pause();
+                          setIsPlaying(false);
+                          onSkip();
+                        }}
+                        className="text-xs bg-black/20 hover:bg-black/40 px-2 py-1 rounded border border-white/20 transition-colors"
+                      >
+                        {isTour ? "End Tour" : "Skip >>"}
+                      </button>
+                    )}
+                  </div>
                 )}
               </div>
               <p className="text-sm leading-relaxed">

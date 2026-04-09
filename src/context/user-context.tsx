@@ -12,7 +12,7 @@ interface UserContextType {
   login: (email: string, password: string) => Promise<{ success: boolean; error?: string }>;
   signup: (username: string, email: string, password: string) => Promise<{ success: boolean; error?: string; sessionCreated?: boolean }>;
   logout: () => Promise<void>;
-  updateScore: (points: number) => Promise<void>;
+  updateScore: (points: number, metadata?: { moduleId: number; moduleName: string; accuracy?: number }) => Promise<void>;
   setAvatar: (avatar: 'male' | 'female') => Promise<void>;
   completeTour: () => Promise<void>;
   isNewUser: boolean;
@@ -119,22 +119,57 @@ export function UserProvider({ children }: { children: ReactNode }) {
     setProfile(null);
   };
 
-  const updateScore = async (points: number) => {
+  const updateScore = async (points: number, metadata?: { moduleId: number; moduleName: string; accuracy?: number }) => {
     if (!user || !profile) return;
 
-    const newScore = profile.score + points;
-    const newXp = profile.xp + points;
-    const newLevel = newXp >= profile.level * 500 ? profile.level + 1 : profile.level;
+    // Use latest profile data to prevent stale state clobbering
+    const { data: latestProfile } = await (supabase as any)
+      .from("profiles")
+      .select("*")
+      .eq("id", user.id)
+      .single();
 
+    const currentScore = latestProfile?.score ?? profile.score;
+    const currentXp = latestProfile?.xp ?? profile.xp;
+
+    const newScore = currentScore + points;
+    const newXp = currentXp + points;
+    
+    // Dynamic level calculation: 500 XP per level
+    const newLevel = Math.floor(newXp / 500) + 1;
+
+    console.log(`[XP Update] Points: ${points}, New XP: ${newXp}, New Level: ${newLevel}`);
+
+    // 1. Update Profile (Live XP/Level)
     const { data, error } = await (supabase as any)
       .from("profiles")
-      .update({ score: newScore, xp: newXp, level: newLevel, updated_at: new Date().toISOString() })
+      .update({ 
+        score: newScore, 
+        xp: newXp, 
+        level: newLevel, 
+        updated_at: new Date().toISOString() 
+      })
       .eq("id", user.id)
       .select()
       .single();
 
     if (!error && data) {
       setProfile(data as Profile);
+    }
+
+    // 2. Log to Gradebook (Student Submissions) - ONLY if metadata is provided (usually module completion)
+    if (metadata) {
+      await (supabase as any)
+        .from("student_submissions")
+        .insert({
+          user_id: user.id,
+          username: profile.username,
+          module_id: metadata.moduleId,
+          module_name: metadata.moduleName,
+          xp_earned: points,
+          accuracy: metadata.accuracy || 100,
+          completed_at: new Date().toISOString()
+        });
     }
   };
 

@@ -6,14 +6,17 @@ import { Badge } from "@/components/ui/badge";
 import { Shield, Clock, Trophy, Target, BookOpen, Play } from "lucide-react";
 
 interface ModuleBriefingProps {
+  title: string;
+  description: string;
+  objectives: string[];
   moduleName: string;
   onAccept: () => void;
 }
 
-export function ModuleBriefing({ moduleName, onAccept }: ModuleBriefingProps) {
+export function ModuleBriefing({ title, description, objectives, moduleName, onAccept }: ModuleBriefingProps) {
   return (
-    <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4">
-      <Card className="max-w-3xl w-full bg-gradient-to-br from-slate-900 to-blue-950 border-2 border-cyan-500/50 shadow-2xl shadow-cyan-500/20">
+    <div className="w-full animate-in fade-in zoom-in duration-500">
+      <Card className="w-full bg-gradient-to-br from-slate-900 to-blue-950 border-2 border-cyan-500/50 shadow-2xl shadow-cyan-500/20">
         <CardContent className="p-8">
           {/* Header */}
           <div className="text-center mb-6">
@@ -21,7 +24,7 @@ export function ModuleBriefing({ moduleName, onAccept }: ModuleBriefingProps) {
               <Shield className="w-10 h-10 text-cyan-400" />
             </div>
             <h2 className="text-4xl font-bold text-transparent bg-clip-text bg-gradient-to-r from-cyan-400 to-blue-500 mb-2">
-              Mission Briefing
+              {title}
             </h2>
             <div className="flex items-center justify-center gap-2">
               <Badge variant="outline" className="border-cyan-500/50 text-cyan-300">
@@ -38,8 +41,7 @@ export function ModuleBriefing({ moduleName, onAccept }: ModuleBriefingProps) {
                 Mission Overview
               </h3>
               <p className="text-blue-100 leading-relaxed">
-                Welcome, recruit! In this mission, you'll learn the art of password security by attempting to crack a digital vault. 
-                Your guide, Cypher, will walk you through creating unbreakable passwords and understanding what makes them secure.
+                {description}
               </p>
             </div>
 
@@ -51,22 +53,12 @@ export function ModuleBriefing({ moduleName, onAccept }: ModuleBriefingProps) {
                   What You'll Learn
                 </h4>
                 <ul className="space-y-1 text-sm text-slate-300">
-                  <li className="flex items-start gap-2">
-                    <span className="text-cyan-400">•</span>
-                    Password entropy and complexity
-                  </li>
-                  <li className="flex items-start gap-2">
-                    <span className="text-cyan-400">•</span>
-                    Dictionary word vulnerabilities
-                  </li>
-                  <li className="flex items-start gap-2">
-                    <span className="text-cyan-400">•</span>
-                    Common attack methods
-                  </li>
-                  <li className="flex items-start gap-2">
-                    <span className="text-cyan-400">•</span>
-                    Best practices for strong passwords
-                  </li>
+                  {objectives.map((obj, i) => (
+                    <li key={i} className="flex items-start gap-2">
+                      <span className="text-cyan-400">•</span>
+                      {obj}
+                    </li>
+                  ))}
                 </ul>
               </div>
 

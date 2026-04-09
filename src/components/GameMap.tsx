@@ -176,6 +176,22 @@ export function GameMap({ children, onPositionChange, gridSize = 50 }: GameMapPr
         </div>
       </div>
 
+      {/* Phishing Lab Station */}
+      <div 
+        className="absolute"
+        style={{
+          left: 1 * gridSize,
+          top: 3 * gridSize,
+        }}
+      >
+        <div className="w-12 h-12 bg-purple-600/30 border-2 border-purple-500 rounded-lg flex items-center justify-center animate-pulse">
+          <span className="text-2xl">🎣</span>
+        </div>
+        <div className="absolute -bottom-6 left-1/2 -translate-x-1/2 text-xs text-purple-300 whitespace-nowrap">
+          Phishing Lab
+        </div>
+      </div>
+
       {/* Player Character */}
       <div
         className={`absolute transition-all duration-200 ease-out z-10 ${

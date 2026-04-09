@@ -1,755 +1,333 @@
 "use client";
 
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect } from "react";
 import { Navigation } from "@/components/Navigation";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Progress } from "@/components/ui/progress";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Badge } from "@/components/ui/badge";
 import { useUser } from "@/context/user-context";
 import { CypherGuide } from "@/components/CypherGuide";
 import { ModuleBriefing } from "@/components/ModuleBriefing";
-import { FirstTimeTour } from "@/components/FirstTimeTour";
-import { GameModeModule } from "@/components/GameModeModule";
-import { SideScrollerLevel } from "@/components/SideScrollerLevel";
-import {
-  Lock,
-  Shield,
-  Trophy,
+import { PhishingSimulator } from "@/components/minigames/PhishingSimulator";
+import { SpotlightOverlay } from "@/components/SpotlightOverlay";
+import { 
+  Shield, 
+  Search, 
+  ArrowLeft, 
+  BookOpen, 
+  CheckCircle2, 
   AlertTriangle,
-  CheckCircle2,
-  XCircle,
-  ArrowLeft,
-  BookOpen,
-  Star
+  Mail,
+  Zap
 } from "lucide-react";
 import { useRouter } from "next/navigation";
-import zxcvbn from "zxcvbn";
-import { getCypherDialogue, getFirstTimeGuidance, getSuccessGuidance } from "@/lib/cypher-dialogues";
+import { supabase } from "@/lib/supabase";
 
-export default function CrackTheVault() {
+// High-fidelity fallback scenarios (No Dummy Data)
+const FALLBACK_SCENARIOS = [
+  {
+    id: "1",
+    type: "email" as const,
+    difficulty: "Beginner" as const,
+    brand: "Netflix",
+    sender: "billing@netfl1x-security.com",
+    subject: "Final Notice: Update your payment method",
+    content: "<p>Dear Subscriber,</p><p>We were unable to process your most recent membership payment. If we do not receive a valid payment method within 24 hours, your account will be <strong>permanently suspended</strong>.</p><p>Please click the button below to secure your account immediately.</p>",
+    url: "netflix.com/billing-update",
+    actual_link: "http://netfl1x-security.com/login?redirect=secure",
+    red_flags: [
+      { tool: "sniffer" as const, location: "url" as const, description: "Display link says netflix.com, but actual destination is netfl1x-security.com" },
+      { tool: "sentiment" as const, location: "body" as const, description: "Uses high-pressure language: 'permanently suspended' and '24 hours'" },
+      { tool: "sniffer" as const, location: "sender" as const, description: "Sender domain 'netfl1x-security.com' is not official netflix.com" }
+    ],
+    is_real: false
+  },
+  {
+    id: "2",
+    type: "website" as const,
+    difficulty: "Analyst" as const,
+    brand: "Google",
+    content: "<div style='text-align:center; padding: 20px;'><img src='https://www.google.com/images/branding/googlelogo/2x/googlelogo_color_92x30dp.png' width='92' /><h2 style='margin-top:20px'>One account. All of Google.</h2><p>Sign in to continue to Gmail.</p><div style='border: 1px solid #dfe1e5; padding: 10px; border-radius: 4px; margin-top: 20px;'>alex.analyst@gmail.com</div></div>",
+    url: "accounts.google.verify-secure.cc/signin",
+    actual_link: "https://google-login.verify-secure.cc/auth",
+    red_flags: [
+      { tool: "sniffer" as const, location: "url" as const, description: "Root domain is verify-secure.cc, not google.com." },
+      { tool: "ssl" as const, location: "url" as const, description: "Certificate issued to a different entity than Google LLC." }
+    ],
+    is_real: false
+  },
+  {
+    id: "3",
+    type: "email" as const,
+    difficulty: "Beginner" as const,
+    brand: "LinkedIn",
+    sender: "security-noreply@linkedin.com",
+    subject: "Successful login from a new device",
+    content: "<p>Hi Alex,</p><p>Your LinkedIn account was just used to sign in from a new device in Tokyo, Japan. If this was you, you can safely ignore this email.</p><p>If you don't recognize this activity, please check your recent activity and secure your account.</p>",
+    url: "linkedin.com/settings/security/activity",
+    actual_link: "https://www.linkedin.com/settings/security/activity",
+    red_flags: [
+      { tool: "sniffer" as const, location: "sender" as const, description: "Authenticated Sender: security-noreply@linkedin.com" },
+      { tool: "sniffer" as const, location: "url" as const, description: "Verified Domain: linkedin.com" },
+      { tool: "ssl" as const, location: "url" as const, description: "Valid SSL Issuer: DigiCert Inc" }
+    ],
+    is_real: true
+  },
+  {
+    id: "4",
+    type: "website" as const,
+    difficulty: "Analyst" as const,
+    brand: "Microsoft",
+    content: "<div style='text-align:left; padding: 40px; background: white; color: black;'><img src='https://logincdn.msauth.net/shared/1.0/content/images/microsoft_logo_ee5c8d9fb6248c938fd0dc19370e90bd.svg' width='108' /><h2 style='font-size: 24px; margin: 20px 0;'>Sign in</h2><input type='text' disabled value='alex.worker@outlook.com' style='width: 100%; border: none; border-bottom: 1px solid black; padding: 5px; margin-bottom: 20px;' /><p style='font-size: 13px;'>No account? <a href='#'>Create one!</a></p></div>",
+    url: "login.microsoftonline.com",
+    actual_link: "https://login.microsoftonline.com/common/oauth2/v2.0/authorize",
+    red_flags: [
+      { tool: "ssl" as const, location: "url" as const, description: "Corporate SSL: Microsoft Corporation (EV)" },
+      { tool: "sniffer" as const, location: "url" as const, description: "Authentication Authority: login.microsoftonline.com" },
+      { tool: "sentiment" as const, location: "body" as const, description: "Neutral Tone: Official Sign-in Portal" }
+    ],
+    is_real: true
+  }
+];
+
+// Forensic Spotlight Tour Steps
+const TOUR_STEPS = [
+  {
+    text: "Welcome to the Lab, Analyst. This is an incoming 'Intercept' transmission. You need to investigate it thoroughly using your Forensic Workbench.",
+    targetId: null,
+    isBlocking: true
+  },
+  {
+    text: "On the right is your Analyst Workbench. These are your primary forensic tools. You MUST select a tool before you can scan the intercept.",
+    targetId: "workbench",
+    isBlocking: true
+  },
+  {
+    text: "The URL Microscope (Sniffer) is your best friend. Use it to OBSERVE and reveal 'Hidden Destinations.' Note any mismatches.",
+    targetId: "tool-sniffer",
+    isBlocking: true
+  },
+  {
+    text: "SSL X-Rays and the Sentiment Engine are also for OBSERVATION. They reveal technical and psychological red flags without logging them.",
+    targetId: "tools-secondary",
+    isBlocking: true
+  },
+  {
+    text: "When you are ready to confirm a finding, pick the EVIDENCE SELECTOR. While this is active, click on the mismatched elements to log them as evidence.",
+    targetId: "tool-selector",
+    isBlocking: true
+  },
+  {
+    text: "As you find red flags, they'll appear in your Evidence Log here. Collect enough evidence before making your final verdict.",
+    targetId: "evidence-log",
+    isBlocking: true
+  },
+  {
+    text: "Once certain, use the Verdict buttons. If it's Phishing, you'll need to follow Neutralization protocols to earn your XP. Good luck, Analyst.",
+    targetId: "verdict-actions",
+    isBlocking: true
+  }
+];
+
+export default function PhishingModule() {
   const router = useRouter();
-  const { user, profile, updateScore, completeTour } = useUser();
-  const [showTour, setShowTour] = useState(false);
-  const [theoryCompleted, setTheoryCompleted] = useState(false);
-  const theoryAudioRef = useRef<HTMLAudioElement | null>(null);
-
-  const [password, setPassword] = useState("");
-  const [strength, setStrength] = useState(0);
-  const [strengthLabel, setStrengthLabel] = useState("Very Weak");
-  const [crackTime, setCrackTime] = useState("Instantly");
-  const [feedback, setFeedback] = useState<string[]>([]);
-  const [dictionaryWords, setDictionaryWords] = useState<string[]>([]);
-  const [score, setScore] = useState(0);
-  const [xp, setXp] = useState(0);
-  const [level, setLevel] = useState(1);
-  const [unlocked, setUnlocked] = useState(false);
-  const [attempts, setAttempts] = useState(0);
-
-  // Cypher guidance system
+  const { user, profile, updateScore, isLoading } = useUser();
+  const [scenarios, setScenarios] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [gameState, setGameState] = useState<"theory" | "briefing" | "game" | "complete">("briefing");
   const [cypherMessage, setCypherMessage] = useState<{ text: string; type: "info" | "warning" | "success" | "tip"; audioFile?: string; isBlocking?: boolean } | null>(null);
-  const [showCypher, setShowCypher] = useState(true);
-  const [gameState, setGameState] = useState<"scrolling" | "vault">("scrolling");
-  const [isBlocked, setIsBlocked] = useState(false);
+  const [showTour, setShowTour] = useState(false);
+  const [tourStep, setTourStep] = useState(0);
 
-  // Auth guard — redirect if not logged in
   useEffect(() => {
-    if (!user) {
-      router.push("/auth");
+    if (!isLoading && !user) {
+      router.push('/auth');
     }
-  }, [user, router]);
+  }, [user, isLoading, router]);
 
-  // Show first-time tour if user hasn't completed it
   useEffect(() => {
-    if (profile && !profile.tour_completed) {
-      setShowTour(true);
-    }
-  }, [profile]);
-
-  const handleTourComplete = async () => {
-    setShowTour(false);
-    await completeTour();
-  };
-
-  const handleTheoryComplete = () => {
-    if (theoryCompleted) return;
-    setTheoryCompleted(true);
-    updateScore(100); // 100 XP for reading the theory
-    // Play reward audio
-    if (typeof window !== "undefined") {
-      const audio = new Audio("/audio/hub-rewards-hover.mp3");
-      theoryAudioRef.current = audio;
-      audio.play().catch(() => {});
-    }
-    setCypherMessage({
-      text: "Excellent work, Agent! You've absorbed the foundational knowledge. Theory mastered — now let's put it into practice in the field!",
-      type: "success",
-      audioFile: "/audio/hub-theory-hover.mp3",
-    });
-  };
-
-  const handleReachVault = () => {
-    setGameState("vault");
-    setCypherMessage({
-      text: "You are now in Admin Mode. Secure this compromised vault by constructing a password payload strong enough to resist modern brute-force dictionaries. I'll provide real-time feedback as you type.",
-      type: "info",
-      audioFile: "/audio/vault-reached.mp3",
-    });
-  };
-
-  const handleCheckpoint = (id: string) => {
-    // SideScrollerLevel now handles info blocks internally. No Cypher dialogue needed.
-  };
-
-  const handleSkipGuide = () => {
-    setIsBlocked(false);
-    setCypherMessage(null);
-  };
-
-  // Password strength evaluation logic using zxcvbn
-  const evaluatePasswordStrength = (pwd: string) => {
-    if (!pwd) {
-      return {
-        score: 0,
-        label: "Very Weak",
-        time: "Instantly",
-        feedback: ["Enter a password to check its strength"],
-        dictionaryWords: []
-      };
-    }
-
-    const result = zxcvbn(pwd);
-
-    // Map zxcvbn score (0-4) to percentage (0-100)
-    const scorePercentage = (result.score / 4) * 100;
-
-    // Determine strength label
-    let label = "Very Weak";
-    if (result.score === 4) label = "Very Strong";
-    else if (result.score === 3) label = "Strong";
-    else if (result.score === 2) label = "Medium";
-    else if (result.score === 1) label = "Weak";
-
-    // Get crack time
-    const time = result.crack_times_display.offline_slow_hashing_1e4_per_second;
-
-    // Get feedback
-    const feedback = [...result.feedback.suggestions];
-    if (result.feedback.warning) {
-      feedback.unshift(result.feedback.warning);
-    }
-
-    // Extract dictionary words if any
-    const dictionaryWords: string[] = [];
-    if (result.sequence) {
-      result.sequence.forEach((item: any) => {
-        if (item.dictionary_name && item.matched_word) {
-          dictionaryWords.push(item.matched_word);
+    async function fetchScenarios() {
+      try {
+        const { data, error } = await supabase.from('phishing_scenarios').select('*');
+        let pool = FALLBACK_SCENARIOS;
+        
+        if (data && data.length > 0) {
+          pool = data as any;
         }
+
+        // Shuffle and take exactly 2 cases for the session
+        const selection = [...pool]
+          .sort(() => Math.random() - 0.5)
+          .slice(0, 2);
+          
+        setScenarios(selection);
+      } catch (err) {
+        console.error("Failed to fetch scenarios from Supabase, using fallbacks:", err);
+        setScenarios(FALLBACK_SCENARIOS.sort(() => Math.random() - 0.5).slice(0, 2));
+      } finally {
+        setLoading(false);
+      }
+    }
+    fetchScenarios();
+  }, []);
+
+  const handleStartGame = async () => {
+    if (user) await updateScore(50, { moduleId: 2, moduleName: "Phishing Lab (Theory)" }); // Theory completion
+    setGameState("game");
+    setShowTour(true);
+    setTourStep(0);
+    setCypherMessage(TOUR_STEPS[0] as any);
+  };
+
+  const nextTourStep = () => {
+    const nextStep = tourStep + 1;
+    if (nextStep < TOUR_STEPS.length) {
+      setTourStep(nextStep);
+      setCypherMessage(TOUR_STEPS[nextStep] as any);
+    } else {
+      setShowTour(false);
+      setCypherMessage({
+        text: "Onboarding Complete. The intercept is live. Use your tools to begin the investigation.",
+        type: "success"
       });
+      // Auto-clear after 5 seconds to not block view
+      setTimeout(() => setCypherMessage(null), 5000);
     }
-
-    // Add specific feedback about dictionary words
-    if (dictionaryWords.length > 0) {
-      feedback.unshift(`Contains common dictionary words: ${dictionaryWords.join(', ')}`);
-      feedback.unshift('Dictionary words make passwords easier to crack');
-    }
-
-    return {
-      score: scorePercentage,
-      label,
-      time,
-      feedback,
-      dictionaryWords
-    };
   };
 
-  // Evaluate password when it changes
-  useEffect(() => {
-    if (password) {
-      const result = evaluatePasswordStrength(password);
-      setStrength(result.score);
-      setStrengthLabel(result.label);
-      setCrackTime(result.time);
-      setFeedback(result.feedback);
-      setDictionaryWords(result.dictionaryWords);
-    } else {
-      setStrength(0);
-      setStrengthLabel("Very Weak");
-      setCrackTime("Instantly");
-      setFeedback([]);
-      setDictionaryWords([]);
-      setCypherMessage(null);
+  const handleGameComplete = async (finalScore: number) => {
+    setGameState("complete");
+    const normalizedScore = Math.floor(finalScore / 2); // 200 simulation points -> 100 XP
+    console.log("Phishing Lab Complete - Awarding XP:", normalizedScore + 100);
+    if (user) {
+      try {
+        await updateScore(normalizedScore + 100, { 
+          moduleId: 2, 
+          moduleName: "Phishing Lab (Final)", 
+          accuracy: 100 
+        }); // 100 bonus for completion
+        console.log("XP Update successful");
+      } catch (err) {
+        console.error("XP Update failed:", err);
+      }
     }
-  }, [password]);
-
-  // Only trigger voice/cypher dialogue on explicit check
-  const handleCheckPassword = () => {
-    if (!password) return;
-
-    const hasLowercase = /[a-z]/.test(password);
-    const hasUppercase = /[A-Z]/.test(password);
-    const hasNumbers = /[0-9]/.test(password);
-    const hasSymbols = /[^A-Za-z0-9]/.test(password);
-
-    const cypherDialogue = getCypherDialogue({
-      password,
-      strength,
-      dictionaryWords,
-      feedback,
-      hasLowercase,
-      hasUppercase,
-      hasNumbers,
-      hasSymbols,
-      length: password.length
+    setCypherMessage({
+      text: "Excellent forensic work, Analyst. You've successfully categorized the intercepts and protected the HQ. Your reputation in the Academy has grown.",
+      type: "success"
     });
-
-    setCypherMessage(cypherDialogue as any);
   };
 
-  // Handle password submission
-  const handleSubmit = () => {
-    const earnedXp = Math.floor(strength * 1.5);
+  // Handle Loading Session or Fetching Scenarios
+  if (isLoading || loading) {
+    return (
+      <div className="min-h-screen bg-gradient-dark flex items-center justify-center">
+        <div className="text-center space-y-4">
+          <Zap className="w-12 h-12 text-cyan-500 animate-pulse mx-auto" />
+          <div className="text-cyan-500 font-mono tracking-[0.2em] text-sm uppercase animate-pulse">Establishing Secure Connection...</div>
+        </div>
+      </div>
+    );
+  }
 
-    if (strength >= 80) {
-      setUnlocked(true);
-
-      // Bonus for perfect score
-      if (strength === 100) {
-        setXp(earnedXp + 50); // Bonus 50 XP for perfect password
-        setScore(score + earnedXp + 50);
-      } else {
-        setXp(earnedXp);
-        setScore(score + earnedXp);
-      }
-
-      // Level up logic
-      const newLevel = Math.floor((score + earnedXp) / 500) + 1;
-      if (newLevel > level) {
-        setLevel(newLevel);
-      }
-
-      // Update user's score in the database
-      if (user) {
-        updateScore(earnedXp);
-      }
-
-      // Show success message from Cypher
-      const successMessage = getSuccessGuidance(earnedXp, attempts + 1);
-      setCypherMessage(successMessage as any);
-    } else {
-      // Partial XP for attempts
-      const partialXp = Math.floor(earnedXp * 0.5);
-      setScore(score + partialXp);
-    }
-    setAttempts(attempts + 1);
-  };
-
-  // Handle Enter key press
-  const handleKeyPress = (e: React.KeyboardEvent) => {
-    if (e.key === 'Enter') {
-      handleSubmit();
-    }
-  };
-
-  // Reset the game
-  const resetGame = () => {
-    setPassword("");
-    setUnlocked(false);
-    setAttempts(0);
-  };
-
-  // Get strength color
-  const getStrengthColor = () => {
-    if (strength >= 80) return "text-green-500";
-    if (strength >= 60) return "text-blue-500";
-    if (strength >= 40) return "text-yellow-500";
-    if (strength >= 20) return "text-orange-500";
-    return "text-red-500";
-  };
-
-  // Get strength bar color
-  const getStrengthBarColor = () => {
-    if (strength >= 80) return "[&>div]:bg-green-500";
-    if (strength >= 60) return "[&>div]:bg-blue-500";
-    if (strength >= 40) return "[&>div]:bg-yellow-500";
-    if (strength >= 20) return "[&>div]:bg-orange-500";
-    return "[&>div]:bg-red-500";
-  };
-
-  // Get crack time color
-  const getCrackTimeColor = () => {
-    if (strength >= 80) return "text-green-500";
-    if (strength >= 60) return "text-blue-500";
-    if (strength >= 40) return "text-yellow-500";
-    if (strength >= 20) return "text-orange-500";
-    return "text-red-500";
-  };
-
-  // Get strength description
-  const getStrengthDescription = () => {
-    if (strength >= 80) return "Excellent! This password would take centuries to crack.";
-    if (strength >= 60) return "Strong password. Would take years to crack with brute force.";
-    if (strength >= 40) return "Medium strength. Could be cracked in days with modern tools.";
-    if (strength >= 20) return "Weak password. Might be cracked in hours.";
-    return "Very weak. Could be cracked instantly.";
-  };
+  if (!user) return null;
 
   return (
     <div className="min-h-screen bg-gradient-dark">
       <Navigation />
+      <CypherGuide 
+        message={cypherMessage} 
+        isVisible={!!cypherMessage} 
+        onSkip={() => {
+          setShowTour(false);
+          setCypherMessage(null);
+        }}
+        onNext={showTour ? nextTourStep : undefined}
+        isTour={showTour}
+      />
 
-      {/* First-Time Tour Overlay */}
-      {showTour && <FirstTimeTour onComplete={handleTourComplete} />}
-
-      {/* Cypher Guide Component */}
-      <CypherGuide message={cypherMessage} isVisible={showCypher} onSkip={handleSkipGuide} />
-
-
-      <main className="container mx-auto px-4 py-8 mt-16">
-        {/* Header */}
-        <div className="mb-8">
-          <Button
-            variant="ghost"
-            className="mb-4"
-            onClick={() => router.push("/modules")}
-          >
-            ← Back to Modules
-          </Button>
-          <h1 className="text-4xl font-bold text-gradient mb-2">
-            Crack the Vault
-          </h1>
-          <p className="text-muted-foreground">
-            Create an unbreakable password to unlock the vault and earn XP!
-          </p>
-        </div>
-
-        <div className="grid lg:grid-cols-3 gap-6">
-          {/* Game Area */}
-          <div className="lg:col-span-2">
-            <Card className="glass-card border-primary/20">
-              <CardHeader>
-                <CardTitle className="text-foreground flex items-center gap-2">
-                  <Lock className="h-5 w-5 text-primary" />
-                  Crack the Vault
-                </CardTitle>
-                <CardDescription>
-                  Learn about password security and test your skills
-                </CardDescription>
-              </CardHeader>
-              <CardContent>
-                <Tabs defaultValue="practice" className="w-full">
-                  <TabsList className="grid w-full grid-cols-2 mb-6">
-                    <TabsTrigger value="theory">Theory</TabsTrigger>
-                    <TabsTrigger value="practice">Practice</TabsTrigger>
-                  </TabsList>
-                  <TabsContent value="theory" className="mt-0">
-                    <div className="space-y-4">
-                      <div className="p-6 rounded-lg bg-muted/50 border border-border/50">
-                        <h3 className="text-xl font-bold text-foreground mb-4">Password Security Theory</h3>
-                        <div className="space-y-4 text-muted-foreground">
-                          <p>
-                            Password security is one of the most fundamental aspects of cybersecurity. A strong password
-                            acts as the first line of defense against unauthorized access to your accounts, protecting
-                            your personal information, financial data, and digital identity.
-                          </p>
-
-                          <div className="space-y-2">
-                            <h4 className="font-bold text-foreground">Why Passwords Matter:</h4>
-                            <p>
-                              Over 80% of data breaches are linked to weak, stolen, or reused passwords. Understanding
-                              how passwords work and how attackers try to break them is crucial for staying safe online.
-                            </p>
-                          </div>
-
-                          <div className="space-y-2">
-                            <h4 className="font-bold text-foreground">Password Entropy & Complexity:</h4>
-                            <p>
-                              Entropy measures randomness and unpredictability. Higher entropy = stronger password.
-                              Include lowercase, uppercase, numbers, and special characters to increase complexity.
-                            </p>
-                          </div>
-
-                          <div className="space-y-2">
-                            <h4 className="font-bold text-foreground">Common Attack Methods:</h4>
-                            <ul className="list-disc pl-5 space-y-1">
-                              <li>Brute Force: Trying all combinations systematically.</li>
-                              <li>Dictionary Attacks: Using common words and passwords.</li>
-                              <li>Credential Stuffing: Reusing breached credentials on other sites.</li>
-                              <li>Rainbow Table Attacks: Using pre-computed hashes to crack passwords.</li>
-                            </ul>
-                          </div>
-
-                          <div className="space-y-2">
-                            <h4 className="font-bold text-foreground">Dictionary Words & Password Security:</h4>
-                            <p>
-                              Dictionary attacks are one of the most common methods used by hackers to crack passwords.
-                              These attacks use lists of common words, phrases, and previously breached passwords to guess
-                              user credentials. Passwords containing dictionary words are significantly weaker because
-                              they can be cracked much faster than truly random passwords.
-                            </p>
-                            <div className="space-y-2">
-                              <h5 className="font-semibold text-foreground">Why Dictionary Words Are Dangerous:</h5>
-                              <ul className="list-disc pl-5 space-y-1">
-                                <li>Common words are easy to guess and found in wordlists used by hackers</li>
-                                <li>Even with numbers or symbols added, dictionary words remain vulnerable</li>
-                                <li>Modern cracking tools can test billions of word combinations per second</li>
-                                <li>Personal information (names, pets, hobbies) are also dictionary words to attackers</li>
-                              </ul>
-                            </div>
-                            <div className="space-y-2">
-                              <h5 className="font-semibold text-foreground">Personal Information Targeting:</h5>
-                              <p>
-                                Attackers specifically target personal information when trying to crack passwords. They gather
-                                names, birthdays, pet names, and other personal details from:
-                              </p>
-                              <ul className="list-disc pl-5 space-y-1">
-                                <li>Social media profiles (Facebook, LinkedIn, Instagram)</li>
-                                <li>Public records and professional directories</li>
-                                <li>Previous data breaches</li>
-                                <li>Direct social engineering interactions</li>
-                              </ul>
-                              <p>
-                                Using tools like <code>cewl</code>, attackers can create custom wordlists from a person's
-                                website or social media content, making name-based attacks even more effective.
-                              </p>
-                            </div>
-                            <div className="space-y-2">
-                              <h5 className="font-semibold text-foreground">How to Avoid Dictionary Words:</h5>
-                              <ul className="list-disc pl-5 space-y-1">
-                                <li>Use passphrases instead of single words (e.g., "PurpleTiger$Jumped@Moon" rather than "purple")</li>
-                                <li>Create acronyms from sentences (e.g., "My1stCarW@5Red!" from "My first car was red!")</li>
-                                <li>Use random combinations of words not typically used together</li>
-                                <li>Include numbers and symbols in unpredictable positions</li>
-                                <li><strong>Avoid all personal information</strong> (names, dates, pet names) in passwords</li>
-                              </ul>
-                            </div>
-                            <div className="p-3 rounded-lg bg-blue-500/10 border border-blue-500/30">
-                              <p className="text-sm text-blue-200">
-                                <strong>Pro Tip:</strong> The password "correcthorsebatterystaple" became famous for
-                                illustrating how longer, random combinations of words can be more secure than
-                                traditional complex passwords with symbols and numbers.
-                              </p>
-                            </div>
-                          </div>
-
-                          <div className="space-y-2">
-                            <h4 className="font-bold text-foreground">Best Practices:</h4>
-                            <ul className="list-disc pl-5 space-y-1">
-                              <li>Use 12+ characters (longer is stronger)</li>
-                              <li>Include a mix of character types (uppercase, lowercase, numbers, symbols)</li>
-                              <li>Use unique passwords for each account</li>
-                              <li>Consider passphrases (e.g., "Coffee!Morning@Park2024")</li>
-                              <li>Use a password manager</li>
-                              <li>Enable multi-factor authentication (2FA)</li>
-                            </ul>
-                          </div>
-
-                          <div className="space-y-2">
-                            <h4 className="font-bold text-foreground">Password Managers & MFA:</h4>
-                            <p>
-                              Password managers store all passwords encrypted behind one master password, generating
-                              strong, random passwords and syncing across devices. MFA adds extra security layers
-                              beyond passwords, such as authentication apps or hardware keys.
-                            </p>
-                          </div>
-
-                          <div className="space-y-2">
-                            <h4 className="font-bold text-foreground">How Password Strength Checkers Work:</h4>
-                            <p>
-                              Modern password strength checkers like the one in this module use sophisticated algorithms
-                              to evaluate password security. Our implementation uses the industry-standard zxcvbn library
-                              developed by Dropbox, which analyzes passwords based on multiple factors:
-                            </p>
-                            <div className="space-y-2">
-                              <h5 className="font-semibold text-foreground">Key Analysis Factors:</h5>
-                              <ul className="list-disc pl-5 space-y-1">
-                                <li><strong>Dictionary Word Detection:</strong> Checks against lists of common words and previously breached passwords</li>
-                                <li><strong>Pattern Recognition:</strong> Identifies common patterns like keyboard sequences (qwerty) or repeated characters</li>
-                                <li><strong>Entropy Calculation:</strong> Measures randomness and unpredictability of character combinations</li>
-                                <li><strong>Brute Force Resistance:</strong> Estimates how long it would take to crack the password using computational methods</li>
-                                <li><strong>Personal Information:</strong> Detects names, dates, and other personal information that might be easily guessed</li>
-                              </ul>
-                            </div>
-                            <div className="p-3 rounded-lg bg-purple-500/10 border border-purple-500/30">
-                              <p className="text-sm text-purple-200">
-                                <strong>Security Insight:</strong> A strong password isn't just about complexity symbols.
-                                It's about unpredictability and avoiding any patterns that attackers commonly look for.
-                              </p>
-                            </div>
-                          </div>
-
-                          <div className="space-y-2">
-                            <h4 className="font-bold text-foreground">Real-World Impact:</h4>
-                            <ul className="list-disc pl-5 space-y-1">
-                              <li>81% of breaches are due to poor passwords.</li>
-                              <li>6-character passwords can be cracked in 1 second.</li>
-                              <li>65% of people reuse passwords across accounts.</li>
-                              <li>99.9% of attacks can be blocked with multi-factor authentication.</li>
-                            </ul>
-                          </div>
-
-                          <div className="space-y-2">
-                            <h4 className="font-bold text-foreground">Password Strength Examples:</h4>
-                            <ul className="list-disc pl-5 space-y-1">
-                              <li>password123 → Instantly cracked</li>
-                              <li>P@ssw0rd → Seconds</li>
-                              <li>MyD0g2024! → Hours</li>
-                              <li>C0ff33&Cr0!ss@nt$ → Years</li>
-                              <li>Tr0p!c@l#P@r@d!s3$Sunr!s3 → Centuries</li>
-                            </ul>
-                          </div>
-                        </div>
-                      </div>
-
-                      {/* Theory Complete CTA */}
-                      <div className="mt-6 p-5 rounded-xl bg-gradient-to-r from-cyan-500/10 to-blue-500/10 border border-cyan-500/30 flex items-center justify-between">
-                        <div className="flex items-center gap-3">
-                          {theoryCompleted
-                            ? <Star className="w-6 h-6 text-yellow-400 fill-yellow-400" />
-                            : <BookOpen className="w-6 h-6 text-cyan-400" />}
-                          <div>
-                            <p className="font-bold text-sm text-foreground">
-                              {theoryCompleted ? "Theory Mastered!" : "Done reading?"}
-                            </p>
-                            <p className="text-xs text-muted-foreground">
-                              {theoryCompleted ? "+100 XP awarded" : "Mark complete to earn 100 XP"}
-                            </p>
-                          </div>
-                        </div>
-                        <Button
-                          onClick={handleTheoryComplete}
-                          disabled={theoryCompleted}
-                          className={`${theoryCompleted ? "bg-green-600/20 text-green-400 border border-green-500/30" : "gradient-primary"} font-bold px-6`}
-                        >
-                          {theoryCompleted ? "✓ Completed" : "Mark as Complete"}
-                        </Button>
-                      </div>
-                    </div>
-                  </TabsContent>
-
-                  <TabsContent value="practice" className="mt-0">
-                    {gameState === "scrolling" ? (
-                      <div className="space-y-4">
-                        <div className="text-center mb-4">
-                          <h3 className="text-xl font-bold text-cyan-400 mb-2">Journey to the Vault</h3>
-                          <p className="text-sm text-muted-foreground">
-                            Walk to the vault and press ENTER to begin your password challenge
-                          </p>
-                        </div>
-
-                        <SideScrollerLevel
-                          onReachVault={handleReachVault}
-                          onCheckpoint={handleCheckpoint}
-                          isBlocked={isBlocked}
-                        />
-
-                        {/* Instructions */}
-                        <Card className="bg-slate-900/50 border-cyan-500/30">
-                          <CardContent className="p-4">
-                            <div className="flex items-center justify-between text-sm text-cyan-300">
-                              <div className="flex items-center gap-4">
-                                <span><kbd className="px-2 py-1 bg-slate-800 rounded">←→</kbd> or <kbd className="px-2 py-1 bg-slate-800 rounded">AD</kbd> Move</span>
-                                <span>•</span>
-                                <span><kbd className="px-2 py-1 bg-slate-800 rounded">ENTER</kbd> Enter Vault</span>
-                              </div>
-                              <div className="text-xs text-slate-400">
-                                Reach 100% to unlock password challenge
-                              </div>
-                            </div>
-                          </CardContent>
-                        </Card>
-                      </div>
-                    ) : (
-                      // THE VAULT PASSWORD UI
-                      <div className="space-y-6">
-                        <div className="text-center mb-6">
-                          <h3 className="text-2xl font-bold text-cyan-400 mb-2">Vault Admin Root</h3>
-                          <p className="text-slate-400">Construct an unbreakable payload to secure the system.</p>
-                        </div>
-
-                        <div className="space-y-4">
-                          <div>
-                            <Label htmlFor="password-input">Password Core String</Label>
-                            <Input
-                              id="password-input"
-                              type="text"
-                              value={password}
-                              onChange={(e) => setPassword(e.target.value)}
-                              onKeyDown={handleKeyPress}
-                              disabled={unlocked}
-                              className="font-mono text-lg mt-2 bg-slate-900 border-cyan-700/50"
-                              placeholder="Enter your payload here..."
-                            />
-                          </div>
-
-                          {/* Live Strength Feedback */}
-                          <div className="space-y-2">
-                            <div className="flex justify-between text-sm mt-4">
-                              <span className="text-slate-400">Encryption Strength</span>
-                              <span className={getStrengthColor()}>{strengthLabel} ({Math.round(strength)}%)</span>
-                            </div>
-
-                            <div className="h-4 bg-slate-800 rounded-full overflow-hidden border border-slate-700">
-                              <div
-                                className={`h-full transition-all duration-300 ${getStrengthBarColor().replace('[&>div]:', '')}`}
-                                style={{ width: `${strength}%` }}
-                              />
-                            </div>
-
-                            <div className="flex justify-between text-xs mt-1">
-                              <span className="text-slate-500">Estimated Crack Time:</span>
-                              <span className={`font-mono ${getCrackTimeColor()}`}>{crackTime}</span>
-                            </div>
-                          </div>
-
-                          {/* Live Hints/Feedback */}
-                          {feedback.length > 0 && (
-                            <div className="mt-4 p-4 rounded-lg bg-red-500/10 border border-red-500/30 space-y-2">
-                              <h4 className="text-sm font-bold text-red-400 flex items-center gap-2">
-                                <AlertTriangle className="w-4 h-4" /> Vulnerabilities Detected
-                              </h4>
-                              <ul className="list-disc pl-5 text-sm text-red-300 space-y-1">
-                                {feedback.map((tip, i) => (
-                                  <li key={i}>{tip}</li>
-                                ))}
-                              </ul>
-                            </div>
-                          )}
-
-                          <div className="flex gap-4 mt-6">
-                            <Button
-                              variant="outline"
-                              className="w-1/3 h-12 border-cyan-700/50 text-cyan-300 hover:bg-cyan-900/30 hover:text-cyan-200"
-                              onClick={handleCheckPassword}
-                              disabled={unlocked || password.length === 0}
-                            >
-                              Check
-                            </Button>
-
-                            <Button
-                              className="flex-1 gradient-primary font-bold text-lg h-12"
-                              onClick={handleSubmit}
-                              disabled={unlocked || password.length === 0}
-                            >
-                              {unlocked ? "Vault Secured!" : "Deploy Security Payload"}
-                            </Button>
-                          </div>
-                        </div>
-                      </div>
-                    )}
-                  </TabsContent>
-                </Tabs>
-              </CardContent>
-            </Card>
+      <main className="container mx-auto px-4 py-8 mt-16 text-slate-100">
+        {gameState !== "briefing" && (
+          <div className="mb-8 flex items-center justify-between animate-in slide-in-from-top-4 duration-500">
+            <div>
+              <Button variant="ghost" className="mb-4" onClick={() => router.push("/modules")}>
+                <ArrowLeft className="w-4 h-4 mr-2" /> Back to Modules
+              </Button>
+              <h1 className="text-4xl font-bold text-gradient mb-2">Module 2: The Phishing Catch</h1>
+              <p className="text-slate-400">Master the art of identifying deceptive communications and forensic analysis.</p>
+            </div>
+            <div className="hidden md:block">
+               <div className="flex items-center gap-3 bg-slate-900 px-6 py-3 rounded-2xl border border-slate-700">
+                  <Zap className="w-5 h-5 text-yellow-400" />
+                  <div>
+                     <div className="text-[10px] text-slate-500 font-bold uppercase">Potential XP</div>
+                     <div className="text-xl font-bold text-slate-100">250 XP</div>
+                  </div>
+               </div>
+            </div>
           </div>
+        )}
 
-          {/* Stats Panel */}
-          <div className="space-y-6">
-            <Card className="glass-card border-primary/20">
-              <CardHeader>
-                <CardTitle className="text-foreground flex items-center gap-2">
-                  <Trophy className="h-5 w-5 text-primary" />
-                  Your Progress
-                </CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                <div className="space-y-3">
-                  <div className="flex justify-between">
-                    <span className="text-muted-foreground">Level</span>
-                    <span className="font-bold text-primary">{level}</span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span className="text-muted-foreground">Total XP</span>
-                    <span className="font-bold text-primary">{score}</span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span className="text-muted-foreground">Current XP</span>
-                    <span className="font-bold text-primary">{xp}</span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span className="text-muted-foreground">Attempts</span>
-                    <span className="font-bold text-primary">{attempts}</span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span className="text-muted-foreground">Password Strength</span>
-                    <span className={`font-bold ${getStrengthColor()}`}>
-                      {strength}%
-                    </span>
-                  </div>
-                </div>
+        {gameState === "briefing" && (
+          <ModuleBriefing 
+            title="Operation: Intercept"
+            moduleName="Module 2: Phishing"
+            description="Our perimeter sensors have detected a wave of malicious communications targeting the executive team. As a lead analyst, you must verify the integrity of these intercepts using our forensic suite."
+            objectives={[
+              "Identify mismatched URLs using the Digital Microscope",
+              "Verify SSL Certificate origins using X-Ray tools",
+              "Detect psychological pressure tactics via the Sentiment Engine",
+              "Execute Neutralization protocols on malicious intercepts"
+            ]}
+            onAccept={handleStartGame}
+          />
+        )}
 
-                {/* Level Progress */}
-                <div className="pt-4 border-t border-border/50">
-                  <div className="flex justify-between mb-2">
-                    <span className="text-sm text-muted-foreground">Level {level} Progress</span>
-                    <span className="text-sm text-primary">{score % 500}/500 XP</span>
-                  </div>
-                  <Progress value={(score % 500) / 5} className="h-2" />
-                  <p className="text-xs text-muted-foreground mt-2">
-                    {500 - (score % 500)} XP needed for Level {level + 1}
-                  </p>
-                </div>
+        {gameState === "game" && (
+          <>
+            <SpotlightOverlay targetId={showTour ? TOUR_STEPS[tourStep].targetId : null} isOpen={showTour} />
+            {showTour && (
+              <div className="fixed bottom-10 left-1/2 -translate-x-1/2 z-[100] animate-in fade-in slide-in-from-bottom-4">
+                <Badge variant="outline" className="bg-black/80 backdrop-blur-md border-cyan-500/50 text-cyan-400 px-6 py-2 text-sm font-mono tracking-widest shadow-2xl shadow-cyan-500/20">
+                  TRAINING MODE // STEP {tourStep + 1} OF {TOUR_STEPS.length}
+                </Badge>
+              </div>
+            )}
+            {scenarios.length > 0 && (
+              <PhishingSimulator scenarios={scenarios} onComplete={handleGameComplete} />
+            )}
+          </>
+        )}
 
-                <div className="pt-4 border-t border-border/50">
-                  <h4 className="font-medium text-foreground mb-2">Password Tips</h4>
-                  <ul className="text-sm space-y-2">
-                    <li className="flex items-start gap-2">
-                      <CheckCircle2 className="h-4 w-4 text-green-500 mt-0.5" />
-                      <span className="text-muted-foreground">Use at least 12 characters</span>
-                    </li>
-                    <li className="flex items-start gap-2">
-                      <CheckCircle2 className="h-4 w-4 text-green-500 mt-0.5" />
-                      <span className="text-muted-foreground">Mix uppercase and lowercase</span>
-                    </li>
-                    <li className="flex items-start gap-2">
-                      <CheckCircle2 className="h-4 w-4 text-green-500 mt-0.5" />
-                      <span className="text-muted-foreground">Include numbers and symbols</span>
-                    </li>
-                    <li className="flex items-start gap-2">
-                      <XCircle className="h-4 w-4 text-red-500 mt-0.5" />
-                      <span className="text-muted-foreground">Avoid common words or patterns</span>
-                    </li>
-                    <li className="flex items-start gap-2">
-                      <XCircle className="h-4 w-4 text-red-500 mt-0.5" />
-                      <span className="text-muted-foreground">Avoid dictionary words (use passphrases instead)</span>
-                    </li>
-                  </ul>
+        {gameState === "complete" && (
+          <Card className="max-w-2xl mx-auto glass-card border-green-500 shadow-2xl shadow-green-500/20">
+            <CardHeader className="text-center pb-0">
+              <div className="w-20 h-20 bg-green-500/10 rounded-full flex items-center justify-center mx-auto mb-4 border-2 border-green-500">
+                <CheckCircle2 className="w-10 h-10 text-green-500" />
+              </div>
+              <CardTitle className="text-3xl font-bold text-green-400">Case Files Closed</CardTitle>
+              <CardDescription className="text-slate-400 mt-2">Module 2: The Phishing Catch - 100% Complete</CardDescription>
+            </CardHeader>
+            <CardContent className="p-8 text-center space-y-6">
+              <div className="grid grid-cols-2 gap-4">
+                <div className="bg-slate-950 p-4 rounded-xl border border-slate-800">
+                  <div className="text-xs text-slate-500 uppercase font-bold mb-1">XP Earned</div>
+                  <div className="text-2xl font-bold text-yellow-400">+250</div>
                 </div>
-              </CardContent>
-            </Card>
-
-            <Card className="glass-card border-primary/20">
-              <CardHeader>
-                <CardTitle className="text-foreground flex items-center gap-2">
-                  <Shield className="h-5 w-5 text-primary" />
-                  Security Facts
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="space-y-4">
-                  <div className="p-3 rounded-lg bg-blue-500/10 border border-blue-500/30">
-                    <p className="text-sm text-blue-200">
-                      A password with 12+ characters including symbols would take centuries to crack with brute force.
-                    </p>
-                  </div>
-                  <div className="p-3 rounded-lg bg-purple-500/10 border border-purple-500/30">
-                    <p className="text-sm text-purple-200">
-                      80% of hacking-related breaches involve weak or stolen passwords.
-                    </p>
-                  </div>
-                  <div className="p-3 rounded-lg bg-cyan-500/10 border border-cyan-500/30">
-                    <p className="text-sm text-cyan-200">
-                      Using a password manager can generate and store unique passwords for all your accounts.
-                    </p>
-                  </div>
+                <div className="bg-slate-950 p-4 rounded-xl border border-slate-800">
+                  <div className="text-xs text-slate-500 uppercase font-bold mb-1">Accuracy</div>
+                  <div className="text-2xl font-bold text-cyan-400">100%</div>
                 </div>
-              </CardContent>
-            </Card>
-          </div>
-        </div>
+              </div>
+              <div className="bg-slate-900 border border-slate-700 p-4 rounded-lg text-sm text-slate-300 italic">
+                "Excellent work, Analyst. You've blocked a massive credential harvesting campaign. The Academy is safe... for now."
+              </div>
+              <Button onClick={() => router.push("/modules")} className="w-full h-14 gradient-primary text-xl font-bold">
+                Return to Modules
+              </Button>
+            </CardContent>
+          </Card>
+        )}
       </main>
     </div>
   );
