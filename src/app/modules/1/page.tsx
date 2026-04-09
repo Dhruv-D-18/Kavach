@@ -31,7 +31,7 @@ import { getCypherDialogue, getFirstTimeGuidance, getSuccessGuidance } from "@/l
 
 export default function CrackTheVault() {
   const router = useRouter();
-  const { user, profile, updateScore, completeTour } = useUser();
+  const { user, profile, updateScore, completeTour, isLoading } = useUser();
   const [showTour, setShowTour] = useState(false);
   const [theoryCompleted, setTheoryCompleted] = useState(false);
   const theoryAudioRef = useRef<HTMLAudioElement | null>(null);
@@ -54,12 +54,26 @@ export default function CrackTheVault() {
   const [gameState, setGameState] = useState<"scrolling" | "vault">("scrolling");
   const [isBlocked, setIsBlocked] = useState(false);
 
-  // Auth guard — redirect if not logged in
+  // Auth guard — redirect only after the session finishes loading
   useEffect(() => {
-    if (!user) {
+    if (!isLoading && !user) {
       router.push("/auth");
     }
-  }, [user, router]);
+  }, [isLoading, user, router]);
+
+  // Avoid rendering a partially-initialized screen before auth/profile is ready.
+  if (isLoading) {
+    return (
+      <div className="min-h-screen bg-gradient-dark flex items-center justify-center">
+        <div className="text-center space-y-4 font-mono">
+          <div className="w-16 h-16 border-t-2 border-b-2 border-cyan-500 rounded-full animate-spin mx-auto" />
+          <div className="text-cyan-500 tracking-[0.3em] uppercase text-xs animate-pulse">
+            Establishing Secure Link...
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   // Show first-time tour if user hasn't completed it
   useEffect(() => {
