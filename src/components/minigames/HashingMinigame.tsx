@@ -25,6 +25,7 @@ const generateSimpleHash = (text: string) => {
 const BASE_PASSWORDS = ["apple123", "qwerty!!", "supersecret", "ilovecats"];
 
 export function HashingMinigame({ onComplete }: HashingMinigameProps) {
+  const [introStep, setIntroStep] = useState(0); // 0/1 = instruction pages, 2 = play
   const [users, setUsers] = useState([
     { id: 1, name: "User A", password: "", salt: "" },
     { id: 2, name: "User B", password: "", salt: "" }
@@ -63,10 +64,12 @@ export function HashingMinigame({ onComplete }: HashingMinigameProps) {
   }, []);
 
   const handleSaltChange = (id: number, val: string) => {
+    if (introStep < 2) return;
     setUsers(prev => prev.map(u => u.id === id ? { ...u, salt: val } : u));
   };
 
   const handleVerify = () => {
+    if (introStep < 2) return;
     const salts = users.map(u => u.salt);
     if (salts[0] && salts[1] && salts[0] !== salts[1]) {
       setStep(3); // Success
@@ -84,14 +87,52 @@ export function HashingMinigame({ onComplete }: HashingMinigameProps) {
           The Hashing Factory
         </CardTitle>
         <CardDescription className="text-slate-400 mt-2">
-          Cypher: "These users chose the same password, so their hashes match exactly! Hackers love this. Enter some random 'Salt' for each user to make their final hashes completely unique."
+          <div className="space-y-2">
+            <div className="text-slate-200 font-semibold">Hashing, explained</div>
+            {introStep < 2 ? (
+              <ul className="list-disc pl-5 space-y-1 text-slate-300">
+                {introStep === 0 ? (
+                  <>
+                    <li>A hash is a one‑way fingerprint of a password.</li>
+                    <li>If two users share a password, their hashes can match.</li>
+                    <li>A salt is extra random text that prevents matching hashes.</li>
+                  </>
+                ) : (
+                  <>
+                    <li>Type any short salt for User A.</li>
+                    <li>Type a different salt for User B.</li>
+                    <li>Press Verify when hashes no longer match.</li>
+                  </>
+                )}
+              </ul>
+            ) : (
+              <ul className="list-disc pl-5 space-y-1 text-slate-300">
+                <li>Type a short salt for User A.</li>
+                <li>Type a different salt for User B.</li>
+                <li>Press Verify when hashes no longer match.</li>
+              </ul>
+            )}
+          </div>
         </CardDescription>
       </CardHeader>
       
       <CardContent className="space-y-6">
+        {introStep < 2 && (
+          <div className="flex gap-3">
+            {introStep < 1 ? (
+              <Button onClick={() => setIntroStep(1)} className="flex-1 bg-yellow-600 hover:bg-yellow-500 text-white font-bold">
+                Next
+              </Button>
+            ) : (
+              <Button onClick={() => setIntroStep(2)} className="flex-1 bg-yellow-600 hover:bg-yellow-500 text-white font-bold">
+                Acknowledge &amp; Continue
+              </Button>
+            )}
+          </div>
+        )}
         
         {/* Conveyor Belt View */}
-        <div className="bg-black/50 p-6 rounded-lg border border-slate-700 relative">
+        <div className={`bg-black/50 p-6 rounded-lg border border-slate-700 relative ${introStep < 2 ? "pointer-events-none opacity-50" : ""}`}>
           
           <div className="space-y-8">
             {users.map((u, i) => (
@@ -104,7 +145,7 @@ export function HashingMinigame({ onComplete }: HashingMinigameProps) {
                     {u.password}
                   </div>
                   <Input 
-                    placeholder="add salt..."
+                    placeholder="Type salt..."
                     value={u.salt}
                     onChange={(e) => handleSaltChange(u.id, e.target.value)}
                     className="bg-transparent border-none text-yellow-400 h-full placeholder:text-slate-600 focus-visible:ring-0 max-w-[120px]"
@@ -159,11 +200,11 @@ export function HashingMinigame({ onComplete }: HashingMinigameProps) {
               <CheckCircle2 className="h-8 w-8 shrink-0" />
               <div>
                 <h4 className="font-bold">Hashes Secured</h4>
-                <p className="text-sm opacity-90">Excellent! By appending unique salts, even identical passwords output completely different hashes. Rainbow Table attacks are now useless.</p>
+                <p className="text-sm opacity-90">Same password, different salts → different hashes. That is why websites store salted hashes instead of plain passwords.</p>
               </div>
            </div>
            <Button onClick={onComplete} className="w-full bg-cyan-600 hover:bg-cyan-500 text-white font-bold py-6">
-             Upload to Server & Continue
+             Next
            </Button>
         </CardFooter>
       )}

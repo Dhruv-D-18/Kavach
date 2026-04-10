@@ -94,37 +94,37 @@ const FALLBACK_SCENARIOS = [
 // Forensic Spotlight Tour Steps
 const TOUR_STEPS = [
   {
-    text: "Welcome to the Lab, Analyst. This is an incoming 'Intercept' transmission. You need to investigate it thoroughly using your Forensic Workbench.",
+    text: "Welcome, Agent. This is a suspicious message (an “Intercept”). Your job is simple: inspect it carefully and decide if it’s real or phishing.",
     targetId: null,
     isBlocking: true
   },
   {
-    text: "On the right is your Analyst Workbench. These are your primary forensic tools. You MUST select a tool before you can scan the intercept.",
+    text: "On the right is your Workbench. First, choose a tool there. You can’t scan until a tool is selected.",
     targetId: "workbench",
     isBlocking: true
   },
   {
-    text: "The URL Microscope (Sniffer) is your best friend. Use it to OBSERVE and reveal 'Hidden Destinations.' Note any mismatches.",
+    text: "Start with the URL Microscope. It shows where a link truly goes. If the visible text and the real destination don’t match, that’s a big red flag.",
     targetId: "tool-sniffer",
     isBlocking: true
   },
   {
-    text: "SSL X-Rays and the Sentiment Engine are also for OBSERVATION. They reveal technical and psychological red flags without logging them.",
+    text: "Next, use SSL X‑Ray and Sentiment. SSL checks if the site identity looks trustworthy. Sentiment checks for pressure tactics like urgency, fear, or threats.",
     targetId: "tools-secondary",
     isBlocking: true
   },
   {
-    text: "When you are ready to confirm a finding, pick the EVIDENCE SELECTOR. While this is active, click on the mismatched elements to log them as evidence.",
+    text: "When you find something suspicious, switch to Evidence Selector and click the suspicious part to log it as evidence.",
     targetId: "tool-selector",
     isBlocking: true
   },
   {
-    text: "As you find red flags, they'll appear in your Evidence Log here. Collect enough evidence before making your final verdict.",
+    text: "Your evidence appears here. Collect enough solid clues before making the final decision.",
     targetId: "evidence-log",
     isBlocking: true
   },
   {
-    text: "Once certain, use the Verdict buttons. If it's Phishing, you'll need to follow Neutralization protocols to earn your XP. Good luck, Analyst.",
+    text: "Finally, choose your Verdict: Real or Phishing. If it’s phishing, follow the neutralization step to earn XP. Take your time—accuracy matters.",
     targetId: "verdict-actions",
     isBlocking: true
   }

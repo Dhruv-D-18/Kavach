@@ -158,7 +158,7 @@ export default function OperationIronWall() {
     if (phase !== "briefing") return;
     setGuideMessage({
       type: "info",
-      text: "Scanner line active. Monitor the telemetry panel for anomalies. Deploy rules to neutralize threats before they reach the core."
+      text: "Live scan is active. Watch the numbers on the telemetry panel. If you see a suspicious port, unusually large size, or the same IP repeating, add a rule to block it before packets reach the Core."
     });
     if (typeof window !== "undefined" && "speechSynthesis" in window) {
       window.speechSynthesis.cancel();
@@ -193,7 +193,7 @@ export default function OperationIronWall() {
       setRuleInputValue("");
       setGuideMessage({
          type: "success",
-         text: `Rule Executed: Block ${selectedRuleType} ${ruleInputValue}.`
+       text: `Rule applied: blocking ${selectedRuleType.toUpperCase()} ${ruleInputValue}.`
       });
     };
 
@@ -281,13 +281,13 @@ export default function OperationIronWall() {
       setPhase("failed");
       setGuideMessage({
         type: "warning",
-        text: "System uptime dropped below safe threshold. Re-run simulation and tighten packet triage."
+        text: "Uptime dropped too low. Replay the mission and block threats earlier (especially repeated IP bursts and odd ports)."
       });
     } else if (shouldWin) {
       setPhase("won");
       setGuideMessage({
         type: "success",
-        text: "Mission success. Iron Wall held. Uploading threat neutralization report."
+        text: "Mission success. You kept the service online and stopped the threats. Uploading your report."
       });
       if (user) {
         const earned = Math.max(150, Math.floor(uptime * 2 + neutralized * 6));
@@ -317,7 +317,7 @@ export default function OperationIronWall() {
     setRules([]);
     setGuideMessage({
       type: "tip",
-      text: "Mission live. Watch the telemetry and execute rules to block unauthorized traffic."
+      text: "Mission live. Tip: start by blocking unusual ports, then handle repeated IP bursts. Use size rules for oversized payloads."
     });
   };
 

@@ -20,11 +20,19 @@ interface SideScrollerProps {
 }
 
 const CHECKPOINTS = [
-  { id: "firewall", title: "🔒 Firewall Info", type: "info", x: 180, color: "from-blue-600 to-cyan-500", shadow: "shadow-cyan-500/50", msg: "Firewalls block unauthorized access but allow outbound communication. They are the first line of defense against botnets." },
+  {
+    id: "entropy-intro",
+    title: "🎲 What is Entropy?",
+    type: "info",
+    x: 180,
+    color: "from-blue-600 to-cyan-500",
+    shadow: "shadow-cyan-500/50",
+    msg: "Entropy = how unpredictable a password is.\nMore length and more character types (letters/numbers/symbols) create far more combinations.\nGuessing becomes impractical when combinations explode.\n---\nNext you will open the Entropy Shield.\nYou will tune two sliders: character pool and length.\nGoal: make “Rough time to crack” reach about 100+ years."
+  },
   { id: "entropy", title: "🎲 Entropy Shield", type: "minigame", x: 350, color: "from-green-600 to-emerald-500", shadow: "shadow-green-500/50" },
-  { id: "warnings", title: "⚠️ Weak Passwords", type: "info", x: 550, color: "from-yellow-600 to-orange-500", shadow: "shadow-yellow-500/50", msg: "A weak password can be cracked in seconds using dictionary attacks. Stop relying on 'admin123'." },
+  { id: "warnings", title: "⚠️ Weak Passwords", type: "info", x: 550, color: "from-yellow-600 to-orange-500", shadow: "shadow-yellow-500/50", msg: "Weak passwords are short or predictable.\nAttackers can guess them quickly using automated tools.\n---\nNext, you will see how public profile clues get reused in passwords.\nIn real life, avoid names, pet names, birthdays, and years in passwords." },
   { id: "social", title: "🎣 Social Eng Trap", type: "minigame", x: 750, color: "from-purple-600 to-pink-500", shadow: "shadow-purple-500/50" },
-  { id: "shield", title: "🛡️ 2FA Shield", type: "info", x: 950, color: "from-indigo-600 to-blue-500", shadow: "shadow-blue-500/50", msg: "Two-Factor Authentication (2FA) adds a second layer of security. Even if your password is stolen, the hackers can't get in." },
+  { id: "shield", title: "🛡️ 2FA Shield", type: "info", x: 950, color: "from-indigo-600 to-blue-500", shadow: "shadow-blue-500/50", msg: "Two‑factor authentication (2FA) adds a second step to login.\nIt is your password plus a code from an app, SMS, or a security key.\n---\nIf someone steals your password, 2FA can still stop them.\nTurn on 2FA for important accounts whenever possible." },
   { id: "hashing", title: "⚙️ Hashing Factory", type: "minigame", x: 1100, color: "from-pink-600 to-rose-500", shadow: "shadow-rose-500/50" },
 ];
 
@@ -257,7 +265,7 @@ export function SideScrollerLevel({ onReachVault, onComplete, onCheckpoint, isBl
 
       {/* Modal Overlay for Active Minigame or Info Checkpoint */}
       {activeMinigame && (
-        <div className="absolute inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4">
+        <div className="absolute inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-start justify-center p-4 overflow-y-auto">
           
           {/* Info Types */}
           {activeCpObj?.type === "info" && (

@@ -40,6 +40,7 @@ const PROFILES = [
 ];
 
 export function SocialEngineeringMinigame({ onComplete }: SocialEngineeringMinigameProps) {
+  const [introStep, setIntroStep] = useState(0); // 0/1 = instruction pages, 2 = play
   const [profile, setProfile] = useState<typeof PROFILES[0] | null>(null);
   const [identifiedIds, setIdentifiedIds] = useState<number[]>([]);
   const [selectedPasswordIdx, setSelectedPasswordIdx] = useState<number | null>(null);
@@ -75,6 +76,7 @@ export function SocialEngineeringMinigame({ onComplete }: SocialEngineeringMinig
   }, []);
 
   const handlePasswordClick = (idx: number, isVuln: boolean) => {
+    if (introStep < 2) return;
     if (verified) return;
     
     if (!isVuln) {
@@ -120,7 +122,7 @@ export function SocialEngineeringMinigame({ onComplete }: SocialEngineeringMinig
       <div className="bg-slate-800 border-r border-slate-700/50 p-6 md:w-2/5 flex flex-col shrink-0">
         <h3 className="text-purple-400 font-bold uppercase tracking-widest text-xs mb-4 flex items-center gap-2">
           <Search className="h-4 w-4" />
-          OSINT Profile
+          Public profile (clues)
         </h3>
         
         <div className="text-center mb-6">
@@ -149,9 +151,48 @@ export function SocialEngineeringMinigame({ onComplete }: SocialEngineeringMinig
             Social Engineering Trap
           </CardTitle>
           <CardDescription className="text-slate-400 mt-2">
-            Cypher: "Hackers harvest personal info. Click on the vulnerable passwords, and type the exact piece of OSINT data they used."
+            <div className="space-y-2">
+              <div className="text-slate-200 font-semibold">How it works</div>
+              {introStep < 2 ? (
+                <ul className="list-disc pl-5 space-y-1 text-slate-300">
+                  {introStep === 0 ? (
+                    <>
+                      <li>Attackers read public profiles for clues.</li>
+                      <li>They guess passwords using pet names, years, and teams.</li>
+                      <li>This is called social engineering + OSINT guessing.</li>
+                    </>
+                  ) : (
+                    <>
+                      <li>Read the clues on the left.</li>
+                      <li>Click a weak password that uses a clue.</li>
+                      <li>Type the clue (word or year) to confirm it.</li>
+                    </>
+                  )}
+                </ul>
+              ) : (
+                <ul className="list-disc pl-5 space-y-1 text-slate-300">
+                  <li>Read the clues on the left.</li>
+                  <li>Click a weak password that uses a clue.</li>
+                  <li>Type the clue (word or year) to confirm it.</li>
+                </ul>
+              )}
+            </div>
           </CardDescription>
         </CardHeader>
+
+        {introStep < 2 && (
+          <div className="mb-4 flex gap-3">
+            {introStep < 1 ? (
+              <Button onClick={() => setIntroStep(1)} className="flex-1 bg-purple-600 hover:bg-purple-500 text-white font-bold">
+                Next
+              </Button>
+            ) : (
+              <Button onClick={() => setIntroStep(2)} className="flex-1 bg-purple-600 hover:bg-purple-500 text-white font-bold">
+                Acknowledge &amp; Continue
+              </Button>
+            )}
+          </div>
+        )}
 
         <div className="flex-1 space-y-3 mb-6 relative">
           <div className="text-xs text-purple-400 mb-2 font-bold tracking-widest uppercase">
@@ -177,7 +218,7 @@ export function SocialEngineeringMinigame({ onComplete }: SocialEngineeringMinig
                     <Input 
                       value={guessInput}
                       onChange={(e) => setGuessInput(e.target.value)}
-                      placeholder="What OSINT string was used?"
+                      placeholder="Type the clue from the profile (e.g. year, pet name)..."
                       className="bg-slate-900 border-purple-500/50 focus-visible:ring-purple-500 h-9"
                       onKeyDown={(e) => e.key === 'Enter' && handleGuessSubmit()}
                       autoFocus
@@ -204,7 +245,7 @@ export function SocialEngineeringMinigame({ onComplete }: SocialEngineeringMinig
                </div>
              </div>
              <Button onClick={onComplete} className="w-full bg-cyan-600 hover:bg-cyan-500 text-white font-bold h-12">
-               Continue Mission
+               Next
              </Button>
           </div>
         )}

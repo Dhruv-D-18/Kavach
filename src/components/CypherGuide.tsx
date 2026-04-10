@@ -106,7 +106,7 @@ export function CypherGuide({ message, isVisible, onSkip, onNext, isTour }: Cyph
   };
 
   return (
-    <div className="fixed top-4 right-4 z-50 max-w-md animate-in slide-in-from-right fade-in duration-300">
+    <div className={`fixed top-4 right-4 ${isTour ? "z-[90]" : "z-50"} max-w-md animate-in slide-in-from-right fade-in duration-300`}>
       <Card className={`${getTypeStyles()} border-2 shadow-xl`}>
         <div className="p-4">
           <div className="flex items-start gap-3">

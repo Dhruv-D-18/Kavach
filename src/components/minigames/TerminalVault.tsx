@@ -10,6 +10,7 @@ interface TerminalVaultProps {
 }
 
 export function TerminalVault({ onComplete }: TerminalVaultProps) {
+  const [introStep, setIntroStep] = useState(0); // 0/1 = instruction pages, 2 = play
   const [history, setHistory] = useState<string[]>([
     "KavachOS v2.4.1 (Admin Mode)",
     "Type command or use the Toolkit to interact."
@@ -141,12 +142,14 @@ export function TerminalVault({ onComplete }: TerminalVaultProps) {
 
   const onSubmit = (e: React.FormEvent) => {
     e.preventDefault();
+    if (introStep < 2) return;
     if (!isHacking && !unlocked && input) {
       handleCommand(input);
     }
   };
 
   const triggerToolkit = (cmd: string) => {
+    if (introStep < 2) return;
     if (!isHacking && !unlocked) {
       setInput(cmd);
       handleCommand(cmd);
@@ -179,7 +182,7 @@ export function TerminalVault({ onComplete }: TerminalVaultProps) {
          </div>
 
          <Button onClick={onComplete} size="lg" className="bg-cyan-600 hover:bg-cyan-500 text-white font-bold text-xl px-12 py-6">
-           Enter Admin Mode
+           Next
          </Button>
          <Button
            onClick={() => window.location.href = '/dashboard'}
@@ -194,7 +197,40 @@ export function TerminalVault({ onComplete }: TerminalVaultProps) {
   }
 
   return (
-    <Card className="w-full max-w-5xl bg-slate-950 border-cyan-500 shadow-2xl shadow-cyan-500/20 grid grid-cols-1 md:grid-cols-3 overflow-hidden">
+    <Card className="w-full max-w-5xl bg-slate-950 border-cyan-500 shadow-2xl shadow-cyan-500/20 grid grid-cols-1 md:grid-cols-3 overflow-hidden relative">
+      {introStep < 2 && (
+        <div className="absolute inset-0 z-50 bg-black/70 backdrop-blur-sm flex items-center justify-center p-4">
+          <div className="w-full max-w-lg bg-slate-900 border border-cyan-500/40 rounded-2xl p-6 shadow-2xl">
+            <div className="text-cyan-300 font-bold tracking-widest text-xs mb-3 uppercase">Quick briefing</div>
+            <ul className="list-disc pl-5 space-y-2 text-sm text-slate-200">
+              {introStep === 0 ? (
+                <>
+                  <li>This is a safe simulation of a dictionary attack.</li>
+                  <li>You will run three commands in order to unlock the vault.</li>
+                  <li>Use the buttons on the right if you prefer not to type.</li>
+                </>
+              ) : (
+                <>
+                  <li>Step 1: Run <span className="font-mono text-cyan-300">analyze target</span>.</li>
+                  <li>Step 2: Run <span className="font-mono text-cyan-300">generate_wordlist</span>.</li>
+                  <li>Step 3: Run <span className="font-mono text-cyan-300">crack_vault</span>.</li>
+                </>
+              )}
+            </ul>
+            <div className="mt-5 flex gap-3">
+              {introStep < 1 ? (
+                <Button onClick={() => setIntroStep(1)} className="flex-1 bg-cyan-600 hover:bg-cyan-500 text-white font-bold">
+                  Next
+                </Button>
+              ) : (
+                <Button onClick={() => setIntroStep(2)} className="flex-1 bg-cyan-600 hover:bg-cyan-500 text-white font-bold">
+                  Acknowledge &amp; Continue
+                </Button>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
       
       {/* LEFT: Retro Terminal (2 Columns) */}
       <div className="md:col-span-2 flex flex-col border-r border-slate-800">
