@@ -10,9 +10,9 @@ import { Progress } from "@/components/ui/progress";
 import { CypherGuide } from "@/components/CypherGuide";
 import { useUser } from "@/context/user-context";
 import { supabase } from "@/lib/supabase";
-import { ArrowLeft, Shield, Activity, Zap, Timer, ServerCrash, CheckCircle2 } from "lucide-react";
+import { ArrowLeft, Shield, Activity, Zap, Timer, ServerCrash, CheckCircle2, BookOpen, Target, Trophy } from "lucide-react";
 
-type Phase = "guide" | "playing" | "won" | "failed";
+type Phase = "briefing" | "playing" | "won" | "failed";
 type ThreatType = "unauthorized-port" | "buffer-overflow" | "ddos-surge";
 
 type Packet = {
@@ -25,6 +25,14 @@ type Packet = {
   x: number;
   y: number;
   speed: number;
+  wasScanned?: boolean;
+};
+
+type FirewallRule = {
+  id: string;
+  type: "port" | "ip" | "size";
+  value: string | number;
+  action: "block";
 };
 
 const PLAYFIELD_W = 980;
@@ -78,7 +86,7 @@ function makePacket(id: number, elapsed: number, botnetSource: string | null): P
     threatType,
     x: 10,
     y: 26 + Math.random() * (PLAYFIELD_H - 56),
-    speed: 3.4 + Math.random() * 1.2 + (inSurge ? 0.8 : 0) + (inCrisis ? 0.7 : 0),
+    speed: 2.5 + Math.random() * 0.8 + (inSurge ? 0.6 : 0) + (inCrisis ? 0.5 : 0),
   };
 }
 
@@ -86,28 +94,55 @@ export default function OperationIronWall() {
   const router = useRouter();
   const { user, isLoading, updateScore } = useUser();
 
-  const [phase, setPhase] = useState<Phase>("guide");
+  const [phase, setPhase] = useState<Phase>("briefing");
   const [packets, setPackets] = useState<Packet[]>([]);
-  const [guardianY, setGuardianY] = useState(PLAYFIELD_H / 2 - GUARDIAN_H / 2);
   const [elapsed, setElapsed] = useState(0);
   const [integrity, setIntegrity] = useState(100);
   const [cpuLoad, setCpuLoad] = useState(22);
   const [uptime, setUptime] = useState(100);
   const [neutralized, setNeutralized] = useState(0);
-  const [blockedIp, setBlockedIp] = useState<string | null>(null);
-  const [ipBlockCooldown, setIpBlockCooldown] = useState(0);
   const [flash, setFlash] = useState(false);
-  const [scanPacket, setScanPacket] = useState<Packet | null>(null);
+  const [shake, setShake] = useState(false);
+  const [earnedXP, setEarnedXP] = useState<number | null>(null);
+  
+  // Rule System
+  const [rules, setRules] = useState<FirewallRule[]>([]);
+  const [selectedRuleType, setSelectedRuleType] = useState<"port" | "ip" | "size">("port");
+  const [ruleInputValue, setRuleInputValue] = useState("");
+  
+  // Heuristic Data
+  // Telemetry is now derived from 'packets' using useMemo to prevent "stuck" states
+  const portStats = useMemo(() => {
+    const stats: Record<number, number> = {};
+    packets.forEach(p => {
+      stats[p.port] = (stats[p.port] || 0) + 1;
+    });
+    return stats;
+  }, [packets]);
+
+  const ipStats = useMemo(() => {
+    const stats: Record<string, number> = {};
+    packets.forEach(p => {
+      stats[p.src] = (stats[p.src] || 0) + 1;
+    });
+    return stats;
+  }, [packets]);
+
+  const sizeStats = useMemo(() => {
+    const stats = { normal: 0, large: 0 };
+    packets.forEach(p => {
+      if (p.sizeKb >= 30) stats.large++;
+      else stats.normal++;
+    });
+    return stats;
+  }, [packets]);
+  
   const [guideMessage, setGuideMessage] = useState<{ text: string; type: "info" | "warning" | "success" | "tip" } | null>(null);
-  const [firstBlocks, setFirstBlocks] = useState(0);
+  const [showTutorial, setShowTutorial] = useState(true);
 
   const idRef = useRef(1);
   const botnetRef = useRef<string | null>("112.5.19.77");
-  const keysRef = useRef({ up: false, down: false });
   const lastSpawnAtRef = useRef(0);
-  const lastSpawnYRef = useRef<number | null>(null);
-  const scanPacketRef = useRef<Packet | null>(null);
-  const cooldownRef = useRef(0);
 
   const missionLeft = Math.max(0, MISSION_SECONDS - elapsed);
   const missionProgress = (elapsed / MISSION_SECONDS) * 100;
@@ -116,22 +151,14 @@ export default function OperationIronWall() {
   const inCrisis = elapsed > 62;
 
   useEffect(() => {
-    scanPacketRef.current = scanPacket;
-  }, [scanPacket]);
-
-  useEffect(() => {
-    cooldownRef.current = ipBlockCooldown;
-  }, [ipBlockCooldown]);
-
-  useEffect(() => {
     if (!isLoading && !user) router.push("/auth");
   }, [isLoading, user, router]);
 
   useEffect(() => {
-    if (phase !== "guide") return;
+    if (phase !== "briefing") return;
     setGuideMessage({
       type: "info",
-      text: "Operator, rule set is simple: this web segment expects Port 80 and 443 only. Watch payload sizes and repeated source signatures. Do not rely on color, rely on metadata."
+      text: "Scanner line active. Monitor the telemetry panel for anomalies. Deploy rules to neutralize threats before they reach the core."
     });
     if (typeof window !== "undefined" && "speechSynthesis" in window) {
       window.speechSynthesis.cancel();
@@ -145,85 +172,35 @@ export default function OperationIronWall() {
     }
   }, [phase]);
 
-  useEffect(() => {
-    if (phase !== "playing") return;
-
-    const handleDown = (e: KeyboardEvent) => {
-      if (e.key === "ArrowUp") {
-        e.preventDefault();
-        keysRef.current.up = true;
-      }
-      if (e.key === "ArrowDown") {
-        e.preventDefault();
-        keysRef.current.down = true;
-      }
-      if (e.key === " ") {
-        e.preventDefault();
-        const packet = scanPacketRef.current;
-        if (packet?.isThreat) {
-          setPackets((prev) => prev.filter((p) => p.id !== packet.id));
-          setScanPacket(null);
-          setNeutralized((n) => n + 1);
-          setCpuLoad((c) => Math.max(8, c - 3));
-          setFirstBlocks((b) => {
-            const next = b + 1;
-            if (next <= 3) {
-              setGuideMessage({
-                type: "success",
-                text: `Great intercept, Guardian. Threat neutralized (${next}/3). Keep filtering hostile traffic.`
-              });
-            }
-            return next;
-          });
-        } else if (packet) {
-          setIntegrity((curr) => Math.max(0, curr - 1.5));
-          setCpuLoad((c) => Math.min(100, c + 6));
-          setGuideMessage({
-            type: "warning",
-            text: "False positive. Legitimate traffic was dropped and service stability degraded."
-          });
-        }
-      }
-      if (e.key.toLowerCase() === "b") {
-        e.preventDefault();
-        const packet = scanPacketRef.current;
-        if (cooldownRef.current <= 0 && packet) {
-          setBlockedIp(packet.src);
-          setPackets((prev) => prev.filter((p) => p.src !== packet.src));
-          setScanPacket(null);
-          setIpBlockCooldown(15);
-          setGuideMessage({
-            type: "tip",
-            text: `IP Block deployed on ${packet.src}. Cooldown engaged for 15 seconds.`
-          });
-        }
-      }
+    const removeRule = (id: string) => {
+      setRules(prev => prev.filter(r => r.id !== id));
     };
 
-    const handleUp = (e: KeyboardEvent) => {
-      if (e.key === "ArrowUp") {
-        e.preventDefault();
-        keysRef.current.up = false;
-      }
-      if (e.key === "ArrowDown") {
-        e.preventDefault();
-        keysRef.current.down = false;
-      }
+    const quickFill = (type: "port" | "ip" | "size", value: string | number) => {
+      setSelectedRuleType(type);
+      setRuleInputValue(value.toString());
     };
 
-    window.addEventListener("keydown", handleDown);
-    window.addEventListener("keyup", handleUp);
-    return () => {
-      window.removeEventListener("keydown", handleDown);
-      window.removeEventListener("keyup", handleUp);
+    const addRule = () => {
+      if (!ruleInputValue) return;
+      const newRule: FirewallRule = {
+        id: Math.random().toString(36).substr(2, 9),
+        type: selectedRuleType,
+        value: selectedRuleType === "ip" ? ruleInputValue : parseInt(ruleInputValue),
+        action: "block"
+      };
+      setRules(prev => [...prev, newRule]);
+      setRuleInputValue("");
+      setGuideMessage({
+         type: "success",
+         text: `Rule Executed: Block ${selectedRuleType} ${ruleInputValue}.`
+      });
     };
-  }, [phase]);
 
   useEffect(() => {
     if (phase !== "playing") return;
     const timer = window.setInterval(() => {
       setElapsed((e) => e + 1);
-      setIpBlockCooldown((c) => Math.max(0, c - 1));
       setCpuLoad((c) => Math.max(8, c - 0.8));
     }, 1000);
     return () => window.clearInterval(timer);
@@ -233,65 +210,64 @@ export default function OperationIronWall() {
     if (phase !== "playing") return;
 
     const loop = window.setInterval(() => {
-      setGuardianY((y) => {
-        let next = y;
-        if (keysRef.current.up) next -= 9;
-        if (keysRef.current.down) next += 9;
-        return Math.max(10, Math.min(PLAYFIELD_H - GUARDIAN_H - 10, next));
-      });
-
-      if (Math.random() < (inCrisis ? 0.48 : inSurge ? 0.35 : 0.24)) {
+      if (Math.random() < (inCrisis ? 0.38 : inSurge ? 0.28 : 0.18)) {
         const now = Date.now();
-        const minSpawnGapMs = inCrisis ? 170 : inSurge ? 220 : 280;
+        const minSpawnGapMs = inCrisis ? 350 : inSurge ? 500 : 700;
         if (now - lastSpawnAtRef.current > minSpawnGapMs) {
           let packet = makePacket(idRef.current++, elapsed, botnetRef.current);
-          // Safe distance: avoid visual overlap by forcing lane separation.
-          if (lastSpawnYRef.current !== null && Math.abs(packet.y - lastSpawnYRef.current) < 34) {
-            packet = { ...packet, y: Math.max(20, Math.min(PLAYFIELD_H - 34, packet.y + 52)) };
-          }
           lastSpawnAtRef.current = now;
-          lastSpawnYRef.current = packet.y;
-          setPackets((prev) => [...prev.slice(-70), packet]);
+          setPackets((prev) => [...prev.slice(-120), packet]);
         }
       }
 
-      setPackets((prev) => {
-        const moved = prev
-          .map((p) => ({ ...p, x: p.x + p.speed }))
-          .filter((p) => (blockedIp ? p.src !== blockedIp : true));
+      // 1. STATS ARE PERSISTENT (No auto-resetting this turn)
 
-        // Collision with guardian -> open scan HUD.
-        const colliding = moved.find(
-          (p) =>
-            p.x < GUARDIAN_X + GUARDIAN_W &&
-            p.x + 20 > GUARDIAN_X &&
-            p.y < guardianY + GUARDIAN_H &&
-            p.y + 20 > guardianY
-        );
-        if (colliding) setScanPacket(colliding);
 
-        // Threats hitting server damage integrity.
-        const hitsServer = moved.filter((p) => p.x >= SERVER_X);
+      // 2. DETECT CROSSINGS (SCANNED PACKETS)
+      setPackets((currentPackets) => {
+        const scannerX = 25;
+        
+        const nextPackets = currentPackets.map((p) => {
+           const nextX = p.x + p.speed;
+           if (p.x < scannerX && nextX >= scannerX && !p.wasScanned) {
+              return { ...p, x: nextX, wasScanned: true };
+           }
+           return { ...p, x: nextX };
+        });
+
+        // 3. FILTER RULES
+        const filtered = nextPackets.filter((p) => {
+           const isBlocked = rules.some(rule => {
+              if (rule.type === "port") return Number(p.port) === Number(rule.value);
+              if (rule.type === "ip") return p.src === rule.value;
+              if (rule.type === "size") return p.sizeKb >= Number(rule.value);
+              return false;
+           });
+           
+           if (isBlocked && p.isThreat) setNeutralized(n => n + 1);
+           return !isBlocked;
+        });
+
+        // 4. SERVER IMPACT
+        const hitsServer = filtered.filter((p) => p.x >= SERVER_X);
         const threatHits = hitsServer.filter((p) => p.isThreat).length;
-        const legitHits = hitsServer.filter((p) => !p.isThreat).length;
         if (threatHits > 0) {
-          setIntegrity((curr) => Math.max(0, curr - threatHits * 3.5));
-          setCpuLoad((c) => Math.min(100, c + threatHits * 6));
+          setIntegrity((curr) => Math.max(0, curr - threatHits * 2.5));
+          setCpuLoad((c) => Math.min(100, c + threatHits * 5));
           setFlash(true);
-          window.setTimeout(() => setFlash(false), 120);
-        }
-        if (legitHits > 0) {
-          // Legitimate traffic slightly lowers load by proving healthy flow.
-          setCpuLoad((c) => Math.max(8, c - legitHits * 1.2));
+          setShake(true);
+          window.setTimeout(() => {
+            setFlash(false);
+            setShake(false);
+          }, 150);
         }
 
-        // Remove packets that reached server.
-        return moved.filter((p) => p.x < PLAYFIELD_W + 40);
+        return filtered.filter((p) => p.x < PLAYFIELD_W + 40);
       });
     }, TICK_MS);
 
     return () => window.clearInterval(loop);
-  }, [phase, elapsed, blockedIp, inCrisis, inSurge, guardianY]);
+  }, [phase, elapsed, inCrisis, inSurge, rules]);
 
   useEffect(() => {
     setUptime(Math.max(0, Number(integrity.toFixed(1))));
@@ -315,33 +291,22 @@ export default function OperationIronWall() {
       });
       if (user) {
         const earned = Math.max(150, Math.floor(uptime * 2 + neutralized * 6));
-        updateScore(earned, { moduleId: 3, moduleName: "Operation Iron Wall", accuracy: Math.round(uptime) }).catch(() => {});
-        // Best-effort module completion write for map unlock logic.
-        (supabase as any)
-          .from("levels_progress")
-          .upsert(
-            {
-              user_id: user.id,
-              module_id: 3,
-              completed: true,
-              best_uptime: uptime,
-              threats_neutralized: neutralized,
-              updated_at: new Date().toISOString(),
-            },
-            { onConflict: "user_id,module_id" }
-          )
-          .catch(() => {});
+        setEarnedXP(earned);
+        updateScore(earned, { 
+          moduleId: 3, 
+          moduleName: "Operation Iron Wall", 
+          accuracy: Math.round(uptime) 
+        }).catch(err => {
+          console.error("Failed to update score:", err);
+        });
       }
     }
   }, [integrity, cpuLoad, shouldWin, phase, uptime, neutralized, user, updateScore]);
 
-  const currentSourceBurstCount = useMemo(() => {
-    if (!scanPacket) return 0;
-    return packets.filter((p) => p.src === scanPacket.src).length;
-  }, [packets, scanPacket]);
+  // Final mission calculations and UI mapping
+
 
   const startMission = () => {
-    keysRef.current = { up: false, down: false };
     setPhase("playing");
     setPackets([]);
     setElapsed(0);
@@ -349,13 +314,10 @@ export default function OperationIronWall() {
     setCpuLoad(22);
     setUptime(100);
     setNeutralized(0);
-    setBlockedIp(null);
-    setIpBlockCooldown(0);
-    setScanPacket(null);
-    setFirstBlocks(0);
+    setRules([]);
     setGuideMessage({
       type: "tip",
-      text: "Mission live. DPI discipline: scan packet metadata first. Space drops scanned packet. B blocks scanned source IP. False positives damage service."
+      text: "Mission live. Watch the telemetry and execute rules to block unauthorized traffic."
     });
   };
 
@@ -412,10 +374,6 @@ export default function OperationIronWall() {
                 <div className="text-xs text-muted-foreground mb-1">Mission Timeline</div>
                 <Progress value={missionProgress} className="h-2 [&>div]:bg-purple-500" />
               </div>
-              <div>
-                <div className="text-xs text-muted-foreground mb-1">IP Block Cooldown</div>
-                <Progress value={Math.max(0, 100 - (ipBlockCooldown / 15) * 100)} className="h-2 [&>div]:bg-amber-500" />
-              </div>
             </div>
             <div className="text-xs text-muted-foreground flex flex-wrap gap-4">
               <span className="flex items-center gap-1"><Activity className="w-3 h-3" /> Expected safe traffic: Port 80, ~1.5kb payload</span>
@@ -425,79 +383,302 @@ export default function OperationIronWall() {
           </CardContent>
         </Card>
 
-        {phase === "guide" && (
-          <Card className="glass-card border-primary/20">
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <Shield className="w-5 h-5 text-primary" />
-                Radio Briefing
-              </CardTitle>
-              <CardDescription>
-                Analyze packet headers, defend availability, and keep uptime above 90%.
-              </CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <div className="grid md:grid-cols-3 gap-3 text-sm">
-                  <div className="rounded-lg border border-border/40 bg-background/40 p-3">Unauthorized Port: <span className="text-cyan-300">Not 80/443</span></div>
-                  <div className="rounded-lg border border-border/40 bg-background/40 p-3">Payload Anomaly: <span className="text-cyan-300">&gt; 2kb suspicious</span></div>
-                  <div className="rounded-lg border border-border/40 bg-background/40 p-3">Botnet Pattern: <span className="text-cyan-300">same IP burst</span></div>
-              </div>
-              <Button className="w-full gradient-primary h-12 text-lg font-semibold" onClick={startMission}>
-                Start Mission
-              </Button>
-            </CardContent>
-          </Card>
-        )}
-
-        {phase === "playing" && (
-          <div className={`relative overflow-hidden rounded-xl border-2 ${flash ? "border-rose-500 bg-rose-500/10" : "border-cyan-500/30"} bg-slate-950`} style={{ height: PLAYFIELD_H }}>
-            <div className="absolute inset-0 opacity-15 pointer-events-none" style={{ backgroundImage: "repeating-linear-gradient(0deg, transparent 0px, transparent 8px, rgba(34,211,238,0.2) 9px)" }} />
-
-            {/* Server target */}
-            <div className="absolute top-0 bottom-0 w-[64px] border-l border-cyan-500/40 bg-cyan-500/5" style={{ left: SERVER_X }}>
-              <div className="absolute top-4 left-1/2 -translate-x-1/2 text-[10px] tracking-widest text-cyan-300">CORE</div>
-            </div>
-
-            {/* Guardian */}
-            <div
-              className="absolute w-11 h-11 rounded-lg border border-cyan-300/70 bg-cyan-500/20 shadow-[0_0_14px_rgba(34,211,238,.5)] flex items-center justify-center text-[10px] font-bold text-cyan-200"
-              style={{ left: GUARDIAN_X, top: guardianY }}
-            >
-              NG
-            </div>
-
-            {/* Packets */}
-            {packets.map((p) => (
-              <div
-                key={p.id}
-                className="absolute w-5 h-5 rotate-45 border border-cyan-300/70 bg-cyan-400/20"
-                style={{ left: p.x, top: p.y }}
-                title={`${p.src}:${p.port} • ${p.sizeKb}kb`}
-                onMouseEnter={() => setScanPacket(p)}
-              />
-            ))}
-
-            {/* Scan HUD */}
-            {scanPacket && (
-              <div className="absolute right-4 top-4 w-72 rounded-xl border border-green-500/40 bg-black/85 p-3 shadow-[0_0_20px_rgba(34,197,94,.15)]">
-                <div className="text-[10px] tracking-[0.2em] text-green-400 mb-2">SCAN HUD</div>
-                <div className="text-sm mb-2 text-slate-200">DPI ANALYSIS ACTIVE</div>
-                <div className="text-xs text-slate-300 space-y-1 font-mono">
-                  <div>SRC: {scanPacket.src}</div>
-                  <div>PORT: {scanPacket.port}</div>
-                  <div>SIZE: {scanPacket.sizeKb}kb</div>
-                  <div>TYPE: {scanPacket.threatType ?? "normal"}</div>
-                  <div>FREQ: {currentSourceBurstCount} packets in stream</div>
+        {phase === "briefing" && (
+          <div className="space-y-6 animate-in fade-in zoom-in duration-500">
+            <Card className="glass-card border-cyan-500/50 bg-gradient-to-br from-slate-900 to-blue-950">
+              <CardHeader className="text-center pb-2">
+                <div className="mx-auto w-16 h-16 bg-cyan-500/20 rounded-full flex items-center justify-center mb-4 border border-cyan-500/50">
+                  <Shield className="w-8 h-8 text-cyan-400" />
                 </div>
-                <div className="mt-2 text-[11px] text-cyan-300">
-                  Rule Hint: Only 80/443 expected. Payload above 2kb is suspicious in this segment.
-                </div>
-                <div className="mt-3 text-[11px] text-slate-400">
-                  <kbd className="px-1 py-0.5 bg-slate-800 rounded">SPACE</kbd> Drop Packet •{" "}
-                  <kbd className="px-1 py-0.5 bg-slate-800 rounded">B</kbd> Block Source IP
+                <CardTitle className="text-3xl font-bold text-gradient">Mission Context: Iron Wall</CardTitle>
+                <CardDescription>Network Layer Security & Availability</CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-6">
+                 <div className="bg-slate-950/50 p-6 rounded-xl border border-slate-800 space-y-4">
+                    <h3 className="font-bold text-cyan-400 flex items-center gap-2">
+                       <BookOpen className="w-5 h-5" /> 
+                       The Assignment
+                    </h3>
+                    <p className="text-slate-300 leading-relaxed text-sm">
+                       The Kavach Central Database is under a <strong>Heuristic Probe</strong>. Attackers are testing our perimeter for open doors. Your objective is not just to "block the red," but to analyze the <strong>metadata</strong> of every packet.
+                    </p>
+                 </div>
+
+                 <div className="grid md:grid-cols-2 gap-4 text-sm">
+                    <div className="p-4 rounded-xl bg-slate-950/50 border border-slate-800">
+                       <h4 className="font-bold text-amber-400 mb-2 flex items-center gap-2">
+                          <Target className="w-4 h-4" /> Threat Indicators
+                       </h4>
+                       <ul className="space-y-2 text-xs text-slate-400">
+                          <li>• <span className="text-slate-200">Ports:</span> Web servers only expect Port <strong>80</strong> (HTTP). Blocks 21/23.</li>
+                          <li>• <span className="text-slate-200">Size:</span> Payloads over <strong>2kb</strong> are likely buffer overflows.</li>
+                          <li>• <span className="text-slate-200">Surge:</span> Repeated IPs indicate a coordinated Botnet attack.</li>
+                       </ul>
+                    </div>
+                    <div className="p-4 rounded-xl bg-slate-950/50 border border-slate-800">
+                       <h4 className="font-bold text-emerald-400 mb-2 flex items-center gap-2">
+                          <Activity className="w-4 h-4" /> Mission Success
+                       </h4>
+                       <ul className="space-y-2 text-xs text-slate-400">
+                          <li>• Maintain <strong>90%+ System Integrity</strong>.</li>
+                          <li>• Neutralize the Botnet Surge in Phase 3.</li>
+                          <li>• Use the <strong>Execute Box</strong> to automate your defense.</li>
+                       </ul>
+                    </div>
+                 </div>
+
+                 <Button className="w-full gradient-primary h-14 text-xl font-bold shadow-[0_0_20px_rgba(6,182,212,0.3)]" onClick={startMission}>
+                    INITIALIZE SYSTEM
+                 </Button>
+              </CardContent>
+            </Card>
+
+            {showTutorial && (
+              <div className="fixed inset-0 z-50 bg-slate-950/95 backdrop-blur-md flex items-center justify-center p-4">
+                <div className="max-w-2xl w-full space-y-8 animate-in fade-in slide-in-from-bottom-8 duration-500">
+                  <div className="text-center">
+                    <h2 className="text-4xl font-black italic tracking-tighter text-cyan-400 mb-2">FIREWALL OPERATOR</h2>
+                    <p className="text-slate-500 font-mono uppercase text-xs tracking-[0.3em]">Guardian Calibration Active</p>
+                  </div>
+
+                  <div className="grid md:grid-cols-2 gap-8 py-8">
+                    <div className="space-y-6">
+                      <div className="flex items-center gap-6">
+                        <div className="w-12 h-12 border-2 border-cyan-500 bg-cyan-500/10 rounded-lg flex items-center justify-center">
+                           <Activity className="w-6 h-6 text-cyan-400" />
+                        </div>
+                        <div className="text-sm text-slate-300">
+                          <p className="font-bold text-slate-100 uppercase tracking-wider">Telemetry</p>
+                          <p>Monitor the <strong>Live Distribution</strong> charts to spot anomalies.</p>
+                        </div>
+                      </div>
+
+                      <div className="flex items-center gap-6">
+                        <div className="w-12 h-12 border-2 border-orange-500 bg-orange-500/10 rounded-lg flex items-center justify-center">
+                           <Zap className="w-6 h-6 text-orange-400" />
+                        </div>
+                        <div className="text-sm text-slate-300">
+                          <p className="font-bold text-slate-100 uppercase tracking-wider">Execute Box</p>
+                          <p>Define a rule (e.g. Block Port 21) to <strong>Automate Defense</strong>.</p>
+                        </div>
+                      </div>
+                    </div>
+
+                    <div className="space-y-4 p-6 bg-slate-900/50 rounded-2xl border border-slate-800">
+                       <p className="text-xs font-mono text-cyan-500 mb-2">MISSION THREADS</p>
+                       <div className="space-y-3">
+                          <div className="flex items-center gap-3">
+                             <div className="w-2 h-2 rounded-full bg-cyan-400 shadow-[0_0_8px_rgba(34,211,238,0.8)]"></div>
+                             <p className="text-[11px] text-slate-300">Packets passing the <strong>Scanner Line</strong> update your charts.</p>
+                          </div>
+                          <div className="flex items-center gap-3">
+                             <div className="w-2 h-2 rounded-full bg-rose-500"></div>
+                             <p className="text-[11px] text-slate-300">Blocked packets <strong>Disintegrate</strong> upon firewall impact.</p>
+                          </div>
+                       </div>
+                    </div>
+                  </div>
+
+                  <Button className="w-full h-16 text-2xl font-black tracking-widest bg-cyan-500 hover:bg-cyan-400 text-cyan-950 rounded-2xl transition-all shadow-[0_0_30px_rgba(6,182,212,0.4)]" onClick={() => setShowTutorial(false)}>
+                    I AM READY
+                  </Button>
                 </div>
               </div>
             )}
+          </div>
+        )}
+
+        {phase === "playing" && (
+          <div className="grid lg:grid-cols-12 gap-6">
+             {/* Left Column: The Traffic Stream */}
+             <div className="lg:col-span-8 space-y-4">
+                <div className={`relative overflow-hidden rounded-xl border-2 ${flash ? "border-rose-500 bg-rose-500/10 shadow-[0_0_30px_rgba(244,63,94,0.2)]" : "border-cyan-500/30"} bg-slate-950 transition-all duration-150 ${shake ? "translate-x-1" : "translate-x-0"}`} style={{ height: PLAYFIELD_H }}>
+                   <div className="absolute inset-0 opacity-15 pointer-events-none" style={{ backgroundImage: "repeating-linear-gradient(0deg, transparent 0px, transparent 8px, rgba(34,211,238,0.2) 9px)" }} />
+
+                   {/* Entry Scanner Line (Perimeter Defense) */}
+                   <div className="absolute top-0 bottom-0 w-[4px] bg-gradient-to-b from-transparent via-cyan-400 to-transparent animate-pulse shadow-[0_0_15px_rgba(34,211,238,0.8)]" style={{ left: 25 }}>
+                      <div className="absolute -top-6 left-1/2 -translate-x-1/2 text-[10px] text-cyan-400 font-mono">PERIMETER_SCAN</div>
+                   </div>
+
+                   {/* Server Target (The Core) */}
+                   <div className="absolute top-0 bottom-0 w-[80px] border-l border-cyan-500/40 bg-cyan-500/5 backdrop-blur-[2px]" style={{ left: SERVER_X }}>
+                      <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 rotate-90 text-[10px] tracking-[0.5em] text-cyan-300/50 font-black">CENTRAL_DATABASE</div>
+                   </div>
+
+                   {/* Packets */}
+                      {packets.map((p) => {
+                        const isLarge = p.sizeKb >= 30; // Matches threat generation
+                        const isSuspiciousPort = p.port === 21 || p.port === 23;
+                        const ipOccurrences = ipStats[p.src] || 0;
+                        const isVolumetricThreat = ipOccurrences > 1;
+                        
+                        // A packet only visually looks like a threat if it meets the heuristic criteria
+                        const showsAsThreat = isLarge || isSuspiciousPort || isVolumetricThreat;
+
+                        return (
+                          <div
+                            key={p.id}
+                            className={`absolute flex items-center justify-center transition-all ${
+                              isLarge ? "w-8 h-8 rounded-lg" : 
+                              isSuspiciousPort || isVolumetricThreat ? "w-5 h-5 rotate-45" : 
+                              "w-3 h-3 rotate-45"
+                            } border ${
+                              showsAsThreat ? "border-rose-500/50 bg-rose-500/20 shadow-[0_0_10px_rgba(244,63,94,0.3)]" : 
+                              "border-cyan-400/50 bg-cyan-400/10"
+                            }`}
+                            style={{ left: p.x, top: p.y }}
+                          >
+                            <div className="absolute -top-5 left-1/2 -translate-x-1/2 whitespace-nowrap pointer-events-none">
+                              <span className={`text-[8px] font-mono font-bold px-1 rounded ${
+                                isLarge ? "bg-rose-500 text-white" : 
+                                isSuspiciousPort ? "bg-amber-500 text-slate-950" :
+                                isVolumetricThreat ? "bg-rose-600 text-white" :
+                                "text-cyan-400/40 opacity-0 group-hover:opacity-100"
+                              }`}>
+                                {isLarge ? `${Math.round(p.sizeKb)}kb` : isSuspiciousPort ? `P:${p.port}` : isVolumetricThreat ? "DDoS" : ""}
+                              </span>
+                            </div>
+                          </div>
+                        );
+                      })}
+                </div>
+             </div>
+
+             {/* Right Column: The Heuristic Dashboard */}
+             <div className="lg:col-span-4 space-y-4">
+                {/* Execute Box */}
+                <Card className="glass-card border-orange-500/30 bg-orange-500/5">
+                   <CardHeader className="py-3 px-4">
+                      <CardTitle className="text-xs uppercase tracking-widest text-orange-400 flex items-center gap-2">
+                         <Zap className="w-3 h-3" /> Execute Box
+                      </CardTitle>
+                   </CardHeader>
+                   <CardContent className="px-4 pb-4 space-y-3">
+                      <div className="flex gap-1 p-1 bg-slate-900/50 rounded-lg border border-slate-800">
+                         {(["port", "ip", "size"] as const).map(t => (
+                            <button
+                               key={t}
+                               onClick={() => setSelectedRuleType(t)}
+                               className={`flex-1 py-1.5 text-[10px] font-bold rounded uppercase transition-all ${selectedRuleType === t ? "bg-orange-500 text-slate-950" : "text-slate-500 hover:text-slate-300"}`}
+                            >
+                               {t}
+                            </button>
+                         ))}
+                      </div>
+                      <div className="flex gap-3 items-stretch h-12">
+                         <div className="flex-1 bg-slate-950 border border-slate-800 rounded-lg px-4 flex items-center shadow-inner">
+                            <span className="text-[10px] text-slate-500 font-mono mr-3 uppercase tracking-tighter">Target:</span>
+                            <input 
+                               type="text" 
+                               readOnly
+                               placeholder="Select anomaly..."
+                               className="bg-transparent text-sm font-mono text-orange-400 focus:outline-none cursor-default w-full"
+                               value={ruleInputValue}
+                            />
+                         </div>
+                         <Button 
+                            className="px-8 bg-orange-500 hover:bg-orange-600 text-slate-950 font-black h-full rounded-lg shadow-[0_0_15px_rgba(249,115,22,0.3)] transition-all hover:scale-[1.02] active:scale-[0.98]" 
+                            onClick={addRule}
+                         >
+                            BLOCK
+                         </Button>
+                      </div>
+                   </CardContent>
+                </Card>
+
+                {/* Rule visual feedback is now handled by telemetry alerts */}
+
+
+                {/* Telemetry Panels */}
+                <div className="grid grid-cols-2 gap-4">
+                   <div className="p-3 rounded-xl bg-slate-900/50 border border-slate-800 cursor-pointer hover:bg-slate-900 transition-colors">
+                      <p className="text-[10px] text-cyan-500 uppercase font-bold mb-3 flex justify-between">
+                         Port Analytics <Badge variant="outline" className="text-[8px] h-3 border-cyan-500/30 text-cyan-500">Auto-Select</Badge>
+                      </p>
+                      <div className="space-y-2">
+                         {Object.entries(portStats).filter(([port]) => port !== "80" && port !== "443").slice(0, 3).sort((a,b) => b[1] - a[1]).map(([port, count]) => (
+                            <div key={port} className="space-y-1 group" onClick={() => quickFill("port", port)}>
+                               <div className="flex justify-between text-[10px] font-mono">
+                                  <span className="text-slate-400 group-hover:text-cyan-400">P:{port}</span>
+                                  <span className="text-rose-400 underline underline-offset-2 font-bold">{count}</span>
+                               </div>
+                               <Progress value={Math.min(100, count * 20)} className="h-0.5 [&>div]:bg-rose-500 animate-pulse" />
+                            </div>
+                         ))}
+                         {Object.entries(portStats).filter(([port]) => port === "80" || port === "443").map(([port, count]) => (
+                            <div key={port} className="space-y-1 opacity-50">
+                               <div className="flex justify-between text-[10px] font-mono italic">
+                                  <span className="text-slate-500">P:{port} (Safe)</span>
+                                  <span className="text-emerald-500">{count}</span>
+                               </div>
+                               <Progress value={Math.min(100, count * 5)} className="h-0.5 [&>div]:bg-emerald-500" />
+                            </div>
+                         ))}
+                      </div>
+                   </div>
+                   <div className="p-3 rounded-xl bg-slate-900/50 border border-slate-800">
+                      <p className="text-[10px] text-amber-500 uppercase font-bold mb-3 flex justify-between">
+                        IP Surge Detection <Badge variant="outline" className="text-[8px] h-3 border-amber-500/30 text-amber-500">Volumetric</Badge>
+                      </p>
+                      <div className="space-y-2">
+                         {Object.entries(ipStats)
+                           .filter(([_, count]) => count > 1) // Noise Filter: Ignore unique IPs
+                           .sort((a,b) => b[1] - a[1]) // Sort: Highest talkers first
+                           .slice(0, 3)
+                           .map(([ip, count]) => {
+                             const isThreat = count >= 5;
+                             return (
+                               <div 
+                                 key={ip} 
+                                 className={`space-y-1 cursor-pointer group p-1 rounded transition-all ${isThreat ? "bg-rose-500/10 animate-pulse border border-rose-500/20" : "hover:bg-slate-800"}`}
+                                 onClick={() => quickFill("ip", ip)}
+                               >
+                                 <div className="flex justify-between text-[10px] font-mono">
+                                    <span className={`truncate w-16 transition-colors ${isThreat ? "text-rose-400 font-bold" : "text-slate-400 group-hover:text-amber-400"}`}>
+                                      {isThreat && "⚠️ "}{ip}
+                                    </span>
+                                    <span className={isThreat ? "text-rose-400 font-black animate-bounce" : "text-slate-500"}>
+                                      {count} pkts
+                                    </span>
+                                 </div>
+                                 <Progress 
+                                   value={Math.min(100, count * 12)} 
+                                   className={`h-0.5 ${isThreat ? "[&>div]:bg-rose-500" : "[&>div]:bg-slate-700 group-hover:[&>div]:bg-amber-500 transition-all"}`} 
+                                 />
+                               </div>
+                             );
+                           })}
+                         {Object.entries(ipStats).filter(([_, count]) => count > 1).length === 0 && (
+                           <div className="text-[9px] text-slate-600 italic py-4 text-center">No statistical anomalies detected</div>
+                         )}
+                      </div>
+                   </div>
+                   <div className="p-3 col-span-2 rounded-xl bg-slate-900/50 border border-slate-800 hover:bg-slate-900 transition-colors cursor-pointer group" onClick={() => quickFill("size", 25)}>
+                      <p className="text-[10px] text-emerald-500 uppercase font-bold mb-2 flex justify-between">
+                        Payload (Size Distribution) <Badge variant="outline" className="text-[8px] h-3 border-emerald-500/30 text-emerald-500">Buffer Probe</Badge>
+                      </p>
+                      <div className="flex gap-4 items-center">
+                         <div className="flex-1">
+                            <div className="flex justify-between text-[9px] mb-1">
+                               <span className={sizeStats.large > 0 ? "text-rose-400 font-bold" : "text-slate-500"}>
+                                 {sizeStats.large > 0 && "🔥 "}THREAT_LARGE (>30kb)
+                               </span>
+                               <span className={sizeStats.large > 0 ? "text-rose-500 font-black animate-pulse" : "text-slate-600"}>{sizeStats.large}</span>
+                            </div>
+                            <Progress value={Math.min(100, (sizeStats.large / 3) * 100)} className={`h-1.5 ${sizeStats.large > 0 ? "[&>div]:bg-rose-500 shadow-[0_0_8px_rgba(244,63,94,0.4)]" : "[&>div]:bg-slate-800"}`} />
+                         </div>
+                         <div className="flex-1 opacity-50 text-xs">
+                            <div className="flex justify-between text-[8px] mb-0.5 font-mono">
+                               <span>NORMAL_BAND</span>
+                               <span>{sizeStats.normal}</span>
+                            </div>
+                            <Progress value={Math.min(100, (sizeStats.normal / 20) * 100)} className="h-0.5 [&>div]:bg-emerald-500/50" />
+                         </div>
+                      </div>
+                      <p className="text-[8px] text-slate-600 mt-2 italic font-mono uppercase tracking-[0.2em] group-hover:text-emerald-400 transition-colors">>> Monitor for oversized buffer probes</p>
+                   </div>
+                </div>
+             </div>
           </div>
         )}
 
@@ -521,13 +702,32 @@ export default function OperationIronWall() {
                 Final Uptime: {uptime.toFixed(1)}% • Threats Neutralized: {neutralized}
               </CardDescription>
             </CardHeader>
-            <CardContent className="flex flex-wrap gap-3">
-              <Button className="gradient-primary" onClick={startMission}>
-                Replay Mission
-              </Button>
-              <Button variant="outline" onClick={() => router.push("/modules")}>
-                Back to Modules
-              </Button>
+            <CardContent>
+              <div className="flex flex-wrap gap-3 mb-6">
+                <Button className="gradient-primary" onClick={startMission}>
+                  Replay Mission
+                </Button>
+                <Button variant="outline" onClick={() => router.push("/modules")}>
+                  Back to Modules
+                </Button>
+              </div>
+
+              {earnedXP && (
+                <div className="p-4 rounded-xl bg-cyan-500/10 border border-cyan-500/30 animate-in fade-in zoom-in slide-in-from-bottom-4 duration-500">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-3">
+                      <div className="w-10 h-10 rounded-full bg-cyan-500/20 flex items-center justify-center">
+                        <Trophy className="w-5 h-5 text-cyan-400" />
+                      </div>
+                      <div>
+                        <p className="text-xs text-cyan-500 font-mono uppercase tracking-widest">Rewards Dispersed</p>
+                        <p className="text-lg font-bold text-slate-100">+{earnedXP} XP Earned</p>
+                      </div>
+                    </div>
+                    <Badge variant="outline" className="border-cyan-500/50 text-cyan-400">MISSION_COMPLETE_SYNCED</Badge>
+                  </div>
+                </div>
+              )}
             </CardContent>
           </Card>
         )}

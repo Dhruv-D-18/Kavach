@@ -1,5 +1,6 @@
 "use client";
 
+import { useState, useEffect } from "react";
 import { Navigation } from "@/components/Navigation";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -20,11 +21,82 @@ import {
   Settings
 } from "lucide-react";
 import { useUser } from "@/context/user-context";
+import { supabase } from "@/lib/supabase";
 
 export default function Profile() {
   const { user, profile, isLoading } = useUser();
-  
-  // Handle Loading Session
+  const [history, setHistory] = useState<any[]>([]);
+  const [stats, setStats] = useState({ modules: 0 });
+  const [updateLoading, setUpdateLoading] = useState(false);
+  const [formData, setFormData] = useState({
+    username: "",
+    email: "",
+    newPassword: ""
+  });
+  const [message, setMessage] = useState<{ text: string; type: "success" | "error" } | null>(null);
+
+  useEffect(() => {
+    if (profile) {
+      setFormData(prev => ({ ...prev, username: profile.username }));
+    }
+    if (user) {
+      setFormData(prev => ({ ...prev, email: user.email || "" }));
+    }
+  }, [profile, user]);
+
+  const handleUpdateAccount = async () => {
+    if (!user) return;
+    setUpdateLoading(true);
+    setMessage(null);
+    try {
+      // 1. Update Username in Profiles table
+      if (formData.username && formData.username !== profile?.username) {
+        const { error: profileError } = await (supabase as any)
+          .from("profiles")
+          .update({ username: formData.username, updated_at: new Date().toISOString() })
+          .eq("id", user.id);
+        
+        if (profileError) throw profileError;
+      }
+
+      // 2. Update Email/Password in Supabase Auth
+      const updatePayload: any = {};
+      if (formData.email && formData.email !== user.email) updatePayload.email = formData.email;
+      if (formData.newPassword) updatePayload.password = formData.newPassword;
+
+      if (Object.keys(updatePayload).length > 0) {
+        const { error: authError } = await supabase.auth.updateUser(updatePayload);
+        if (authError) throw authError;
+      }
+
+      setMessage({ text: "Account credentials updated successfully.", type: "success" });
+      setFormData(prev => ({ ...prev, newPassword: "" })); // Clear password field
+    } catch (err: any) {
+      console.error("Update error:", err);
+      setMessage({ text: err.message || "Failed to update account.", type: "error" });
+    } finally {
+      setUpdateLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    async function fetchHistory() {
+      if (!user) return;
+      const { data, error } = await (supabase as any)
+        .from('student_submissions')
+        .select('*')
+        .eq('user_id', user.id)
+        .order('completed_at', { ascending: false });
+
+      if (!error && data) {
+        setHistory(data);
+        // Count unique modules
+        const uniqueModules = new Set(data.map((s: any) => s.module_id)).size;
+        setStats({ modules: uniqueModules });
+      }
+    }
+    fetchHistory();
+  }, [user]);
   if (isLoading) {
     return (
       <div className="min-h-screen bg-gradient-dark flex items-center justify-center">
@@ -123,146 +195,108 @@ export default function Profile() {
         </div>
 
         {/* Stats Grid */}
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
-          <Card className="glass-card border-primary/20">
-            <CardHeader className="pb-3">
-              <CardTitle className="text-sm text-muted-foreground flex items-center gap-2">
-                <Trophy className="h-4 w-4 text-primary" />
-                Total XP
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold text-primary">
-                {(profile?.score ?? 0).toLocaleString()}
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-8">
+          <Card className="glass-card cyber-border">
+            <CardContent className="p-6">
+              <div className="flex items-center gap-4">
+                <div className="p-3 bg-primary/10 rounded-xl">
+                  <Trophy className="w-6 h-6 text-primary" />
+                </div>
+                <div>
+                  <p className="text-sm text-muted-foreground font-medium">Total XP</p>
+                  <p className="text-2xl font-bold text-slate-100">{profile?.xp.toLocaleString()}</p>
+                </div>
               </div>
             </CardContent>
           </Card>
 
-          <Card className="glass-card border-primary/20">
-            <CardHeader className="pb-3">
-              <CardTitle className="text-sm text-muted-foreground flex items-center gap-2">
-                <Target className="h-4 w-4 text-primary" />
-                Modules
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold text-primary">
-                0
+          <Card className="glass-card cyber-border">
+            <CardContent className="p-6">
+              <div className="flex items-center gap-4">
+                <div className="p-3 bg-primary/10 rounded-xl">
+                  <Target className="w-6 h-6 text-primary" />
+                </div>
+                <div>
+                  <p className="text-sm text-muted-foreground font-medium">Modules</p>
+                  <p className="text-2xl font-bold text-slate-100">{stats.modules}</p>
+                </div>
               </div>
             </CardContent>
           </Card>
 
-          <Card className="glass-card border-primary/20">
-            <CardHeader className="pb-3">
-              <CardTitle className="text-sm text-muted-foreground flex items-center gap-2">
-                <Activity className="h-4 w-4 text-primary" />
-                Streak
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold text-primary">
-                0 🔥
-              </div>
-            </CardContent>
-          </Card>
-
-          <Card className="glass-card border-primary/20">
-            <CardHeader className="pb-3">
-              <CardTitle className="text-sm text-muted-foreground flex items-center gap-2">
-                <Shield className="h-4 w-4 text-primary" />
-                Security
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold text-primary">
-                Level {profile?.level ?? 1}
+          <Card className="glass-card cyber-border">
+            <CardContent className="p-6">
+              <div className="flex items-center gap-4">
+                <div className="p-3 bg-primary/10 rounded-xl">
+                  <Shield className="w-6 h-6 text-primary" />
+                </div>
+                <div>
+                  <p className="text-sm text-muted-foreground font-medium">Clearance Level</p>
+                  <p className="text-2xl font-bold text-cyan-400">Level {profile?.level}</p>
+                </div>
               </div>
             </CardContent>
           </Card>
         </div>
 
-        {/* Content Tabs */}
-        <Tabs defaultValue="activity" className="space-y-6">
-          <TabsList className="glass-card border-primary/20">
-            <TabsTrigger value="activity">Recent Activity</TabsTrigger>
-            <TabsTrigger value="settings">Account Settings</TabsTrigger>
-          </TabsList>
-
-          <TabsContent value="activity">
-            <Card className="glass-card border-primary/20">
-              <CardHeader>
-                <CardTitle className="text-foreground">Your Progress</CardTitle>
-                <CardDescription>Track your learning journey</CardDescription>
-              </CardHeader>
-              <CardContent>
-                <div className="text-center py-8">
-                  <Shield className="h-16 w-16 text-primary mx-auto mb-4" />
-                  <h3 className="text-xl font-bold text-foreground mb-2">Crack the Vault Module</h3>
-                  <p className="text-muted-foreground mb-4">You've completed the password security module with a score of {profile?.score ?? 0} points.</p>
-                  <Button onClick={() => window.location.href = '/modules/1'}>
-                    Practice Again
-                  </Button>
+        <div className="space-y-6">
+          <Card className="glass-card border-primary/20">
+            <CardHeader>
+              <CardTitle className="text-foreground">Account Lifecycle Management</CardTitle>
+              <CardDescription>Update your agent credentials and security protocols</CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-6">
+              {message && (
+                <div className={`p-3 rounded border text-xs font-mono mb-4 ${message.type === "success" ? "bg-emerald-500/10 border-emerald-500/30 text-emerald-400" : "bg-rose-500/10 border-rose-500/30 text-rose-400"}`}>
+                  [{message.type.toUpperCase()}] {message.text}
                 </div>
-              </CardContent>
-            </Card>
-          </TabsContent>
+              )}
 
-          <TabsContent value="settings">
-            <Card className="glass-card border-primary/20">
-              <CardHeader>
-                <CardTitle className="text-foreground">Account Settings</CardTitle>
-                <CardDescription>Manage your account information</CardDescription>
-              </CardHeader>
-              <CardContent className="space-y-6">
-                <div className="space-y-2">
-                  <Label htmlFor="username">Username</Label>
-                  <Input 
-                    id="username" 
-                    defaultValue={profile?.username ?? ""}
-                    className="bg-background/50 border-border/50"
-                  />
-                </div>
+              <div className="space-y-2">
+                <Label htmlFor="username">Username</Label>
+                <Input 
+                  id="username" 
+                  value={formData.username}
+                  onChange={(e) => setFormData({ ...formData, username: e.target.value })}
+                  className="bg-background/50 border-border/50 font-mono"
+                />
+              </div>
 
-                <div className="space-y-2">
-                  <Label htmlFor="email">Email</Label>
-                  <Input 
-                    id="email" 
-                    type="email"
-                    defaultValue={user.email ?? ""}
-                    className="bg-background/50 border-border/50"
-                  />
-                </div>
+              <div className="space-y-2">
+                <Label htmlFor="email">Email</Label>
+                <Input 
+                  id="email" 
+                  type="email"
+                  value={formData.email}
+                  onChange={(e) => setFormData({ ...formData, email: e.target.value })}
+                  className="bg-background/50 border-border/50 font-mono"
+                />
+              </div>
 
-                <div className="space-y-2">
-                  <Label htmlFor="current-password">Current Password</Label>
-                  <Input 
-                    id="current-password" 
-                    type="password"
-                    placeholder="Enter current password"
-                    className="bg-background/50 border-border/50"
-                  />
-                </div>
+              <div className="space-y-2">
+                <Label htmlFor="new-password">New Password</Label>
+                <Input 
+                  id="new-password" 
+                  type="password"
+                  placeholder="Enter new password"
+                  value={formData.newPassword}
+                  onChange={(e) => setFormData({ ...formData, newPassword: e.target.value })}
+                  className="bg-background/50 border-border/50 font-mono"
+                />
+                <p className="text-[10px] text-muted-foreground italic">Leave blank to keep current password</p>
+              </div>
 
-                <div className="space-y-2">
-                  <Label htmlFor="new-password">New Password</Label>
-                  <Input 
-                    id="new-password" 
-                    type="password"
-                    placeholder="Enter new password"
-                    className="bg-background/50 border-border/50"
-                  />
-                </div>
-
-                <div className="flex gap-3 pt-4">
-                  <Button>Save Changes</Button>
-                  <Button variant="outline" className="border-primary/30">
-                    Cancel
-                  </Button>
-                </div>
-              </CardContent>
-            </Card>
-          </TabsContent>
-        </Tabs>
+              <div className="flex gap-3 pt-4">
+                <Button onClick={handleUpdateAccount} disabled={updateLoading} className="gradient-primary">
+                  {updateLoading ? "Synchronizing..." : "Execute Updates"}
+                </Button>
+                <Button variant="outline" className="border-primary/30" onClick={() => window.location.reload()}>
+                  Revert Changes
+                </Button>
+              </div>
+            </CardContent>
+          </Card>
+        </div>
       </main>
     </div>
   );

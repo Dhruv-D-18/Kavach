@@ -16,8 +16,8 @@ interface UserContextType {
   setAvatar: (avatar: 'male' | 'female') => Promise<void>;
   completeTour: () => Promise<void>;
   isNewUser: boolean;
-  activeHoverTour: string | null;
-  setActiveHoverTour: (id: string | null) => void;
+  hasBooted: boolean;
+  setHasBooted: (val: boolean) => void;
   seenDialogues: Set<string>;
   markDialogueSeen: (id: string) => void;
 }
@@ -30,6 +30,7 @@ export function UserProvider({ children }: { children: ReactNode }) {
   const [isLoading, setIsLoading] = useState(true);
   const [isNewUser, setIsNewUser] = useState(false);
   const [activeHoverTour, setActiveHoverTour] = useState<string | null>(null);
+  const [hasBooted, setHasBooted] = useState(false);
   const [seenDialogues, setSeenDialogues] = useState<Set<string>>(new Set());
 
   // Fetch profile from Supabase
@@ -134,7 +135,7 @@ export function UserProvider({ children }: { children: ReactNode }) {
 
     const newScore = currentScore + points;
     const newXp = currentXp + points;
-    
+
     // Dynamic level calculation: 500 XP per level
     const newLevel = Math.floor(newXp / 500) + 1;
 
@@ -143,11 +144,11 @@ export function UserProvider({ children }: { children: ReactNode }) {
     // 1. Update Profile (Live XP/Level)
     const { data, error } = await (supabase as any)
       .from("profiles")
-      .update({ 
-        score: newScore, 
-        xp: newXp, 
-        level: newLevel, 
-        updated_at: new Date().toISOString() 
+      .update({
+        score: newScore,
+        xp: newXp,
+        level: newLevel,
+        updated_at: new Date().toISOString()
       })
       .eq("id", user.id)
       .select()
@@ -221,6 +222,8 @@ export function UserProvider({ children }: { children: ReactNode }) {
       isNewUser,
       activeHoverTour,
       setActiveHoverTour,
+      hasBooted,
+      setHasBooted,
       seenDialogues,
       markDialogueSeen,
     }}>

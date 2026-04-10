@@ -17,7 +17,7 @@ export default function Leaderboard() {
       .from("profiles")
       .select("*")
       .order("score", { ascending: false })
-      .limit(50);
+      .limit(10);
 
     if (!error && data) {
       setPlayers(data as Profile[]);

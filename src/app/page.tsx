@@ -12,13 +12,12 @@ import { HoverZone } from "@/components/HoverZone";
 import { useRouter } from "next/navigation";
 
 export default function Home() {
-  const [bootDone, setBootDone] = useState(false);
-  const { user, isLoading } = useUser();
+  const { user, isLoading, hasBooted, setHasBooted } = useUser();
   const router = useRouter();
 
-  // Show boot animation first
-  if (!bootDone) {
-    return <BootAnimation onComplete={() => setBootDone(true)} />;
+  // Show boot animation only once per session
+  if (!hasBooted) {
+    return <BootAnimation onComplete={() => setHasBooted(true)} />;
   }
 
   // After boot, show loading state while session is being checked
@@ -108,61 +107,68 @@ export default function Home() {
         </section>
       </HoverZone>
 
-      {/* Learning Modules Preview */}
-      <section className="py-20 px-4">
+
+      {/* Footer */}
+      <footer className="mt-20 border-t border-primary/20 bg-slate-950/80 backdrop-blur-md pt-16 pb-8 px-4">
         <div className="container mx-auto">
-          <div className="text-center mb-12">
-            <h2 className="text-4xl font-bold mb-4">Popular Learning Modules</h2>
-            <p className="text-muted-foreground text-lg">Start with these beginner-friendly modules</p>
-          </div>
-
-          <div className="grid md:grid-cols-3 gap-6">
-            <HoverZone tourId="crack-vault" className="h-full">
-              <div
-                className="glass-card cyber-border p-6 rounded-2xl hover:cyber-glow transition-all h-full cursor-pointer group"
-                onClick={() => handleProtectedLink("/modules/1")}
-              >
-                <div className="inline-flex items-center justify-center w-12 h-12 mb-4 rounded-xl bg-primary/10 text-blue-400">
-                  <Lock className="w-6 h-6" />
-                </div>
-                <div className="flex items-center gap-2 mb-2">
-                  <h3 className="text-xl font-bold">Crack the Vault</h3>
-                  <span className="text-xs px-2 py-1 rounded-full bg-primary/20 text-primary">Beginner</span>
-                </div>
-                <p className="text-muted-foreground mb-4">Master the art of creating unbreakable passwords</p>
-                <div className="flex items-center text-primary text-sm font-medium group-hover:gap-2 transition-all">
-                  {user ? "Launch Module" : "Sign in to Play"}
-                  <ArrowRight className="w-4 h-4 opacity-0 group-hover:opacity-100 transition-opacity ml-1" />
-                </div>
+          <div className="grid grid-cols-1 md:grid-cols-4 gap-12 mb-16">
+            {/* Branding Column */}
+            <div className="md:col-span-2 space-y-6">
+              <div className="flex items-center gap-3">
+                <img src="/kavach_logo.png" alt="Kavach" className="w-10 h-10" />
+                <span className="text-2xl font-black tracking-tighter text-white uppercase italic">Kavach</span>
               </div>
-            </HoverZone>
-          </div>
-
-          <div className="text-center mt-8">
-            <Button variant="outline" className="border-primary/30 hover:border-primary" onClick={() => handleProtectedLink("/modules")}>
-              View All Modules
-            </Button>
-          </div>
-        </div>
-      </section>
-
-      {/* CTA Section */}
-      {!user && (
-        <HoverZone tourId="create-account">
-          <section className="py-20 px-4">
-            <div className="container mx-auto">
-              <div className="glass-card cyber-border rounded-3xl p-12 text-center">
-                <h2 className="text-4xl font-bold mb-4">Ready to Defend the Digital World?</h2>
-                <Link href="/auth?mode=signup">
-                  <Button size="lg" className="gradient-primary text-lg font-semibold">
-                    Create Account
-                  </Button>
-                </Link>
+              <p className="text-slate-400 text-sm max-w-sm leading-relaxed">
+                Empowering the next generation of cyber defenders through immersive, gamified learning. Defend the digital realm, earn rewards, and secure your future.
+              </p>
+              <div className="flex gap-4">
+                <div className="w-8 h-8 rounded-lg bg-slate-900 border border-slate-800 flex items-center justify-center hover:border-primary transition-colors cursor-pointer group">
+                  <Globe className="w-4 h-4 text-slate-500 group-hover:text-primary" />
+                </div>
+                <div className="w-8 h-8 rounded-lg bg-slate-900 border border-slate-800 flex items-center justify-center hover:border-primary transition-colors cursor-pointer group">
+                  <Shield className="w-4 h-4 text-slate-500 group-hover:text-primary" />
+                </div>
               </div>
             </div>
-          </section>
-        </HoverZone>
-      )}
+
+            {/* Quick Links */}
+            <div>
+              <h4 className="text-white font-bold mb-6 uppercase text-xs tracking-[0.2em]">Navigation</h4>
+              <ul className="space-y-4 text-sm">
+                <li><Link href="/" className="text-slate-400 hover:text-primary transition-colors">Home Base</Link></li>
+                <li><Link href="/modules" className="text-slate-400 hover:text-primary transition-colors">Training Modules</Link></li>
+                <li><Link href="/leaderboard" className="text-slate-400 hover:text-primary transition-colors">Global Standings</Link></li>
+                <li><Link href="/profile" className="text-slate-400 hover:text-primary transition-colors">Agent Profile</Link></li>
+              </ul>
+            </div>
+
+            {/* Development Team */}
+            <div>
+              <h4 className="text-white font-bold mb-6 uppercase text-xs tracking-[0.2em]">Project Development</h4>
+              <ul className="space-y-4 text-sm">
+                <li className="text-slate-400">
+                  <span className="block text-primary text-[10px] font-mono mb-1">LEAD_DEVELOPER</span>
+                  <a href="https://www.linkedin.com/in/dhruv-dharkar-46826a27a" target="_blank" className="hover:text-white transition-colors">LinkedIn Profile</a>
+                </li>
+                <li className="text-slate-400">
+                  <span className="block text-primary text-[10px] font-mono mb-1">COMMUNICATIONS</span>
+                  <a href="mailto:dhruv.y.dharkar@outlook.com" className="hover:text-white transition-colors">dhruv.y.dharkar@outlook.com</a>
+                </li>
+              </ul>
+            </div>
+          </div>
+
+          <div className="pt-8 border-t border-slate-900 flex flex-col md:flex-row justify-between items-center gap-4">
+            <p className="text-[10px] font-mono text-slate-600 uppercase tracking-widest">
+              © 2026 KAVACH_ACADEMY_SYSTEMS // ALL_RIGHTS_RESERVED
+            </p>
+            <div className="flex gap-6 text-[10px] font-mono text-slate-500 uppercase">
+              <span className="hover:text-primary cursor-pointer transition-colors">Privacy_Protocol</span>
+              <span className="hover:text-primary cursor-pointer transition-colors">Terms_of_Engagement</span>
+            </div>
+          </div>
+        </div>
+      </footer>
     </div>
   );
 }
