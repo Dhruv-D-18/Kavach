@@ -56,16 +56,11 @@ export function CypherGuide({
     }
   }, [isVisible, message, hasEntered]);
 
-  // Mount Audio
+  // Initialize audio object once on mount
   useEffect(() => {
     if (typeof window !== "undefined") {
       audioRef.current = new Audio();
-      audioRef.current.onended = () => {
-        setIsPlaying(false);
-        if (displayedMessage?.isBlocking && onSkip && !onNext) {
-          onSkip();
-        }
-      };
+      audioRef.current.onended = () => setIsPlaying(false);
     }
     return () => {
       if (audioRef.current) {
@@ -73,51 +68,44 @@ export function CypherGuide({
         audioRef.current.src = "";
       }
     };
-  }, [displayedMessage, onSkip, onNext]);
+  }, []);
 
+  // Simple, direct playback logic
   useEffect(() => {
-    if (message) {
-      setIsTyping(true);
-      setDisplayedMessage(message);
-      
+    if (!message || !isVisible) {
+      setDisplayedMessage(null);
       if (audioRef.current) {
         audioRef.current.pause();
+        audioRef.current.src = "";
       }
+      return;
+    }
 
-      const playAudio = async () => {
-        if (message.audioFile && audioRef.current) {
-          try {
-            audioRef.current.src = message.audioFile;
-            await audioRef.current.play();
-            setIsTyping(false);
-            setIsPlaying(true);
-          } catch (err) {
-            console.error("Audio playback stalled (waiting for interaction):", err);
-            setIsTyping(false);
-          }
-        } else {
+    if (audioRef.current) {
+      setDisplayedMessage(message);
+      setIsTyping(true);
+      
+      if (message.audioFile) {
+        audioRef.current.pause();
+        audioRef.current.src = message.audioFile;
+        audioRef.current.play().then(() => {
+          setIsPlaying(true);
           setIsTyping(false);
-        }
-      };
-
-      playAudio();
+        }).catch(err => {
+          console.warn("Audio block/error:", err);
+          setIsTyping(false);
+        });
+      } else {
+        setIsTyping(false);
+      }
 
       let hideTimer: NodeJS.Timeout | null = null;
       if (!message.isBlocking) {
-        hideTimer = setTimeout(() => {
-          setDisplayedMessage(null);
-        }, displayDuration);
+        hideTimer = setTimeout(() => setDisplayedMessage(null), displayDuration);
       }
-
-      return () => {
-        if (hideTimer) clearTimeout(hideTimer);
-      };
-    } else {
-      setDisplayedMessage(null);
-      if (audioRef.current) audioRef.current.pause();
-      setIsPlaying(false);
+      return () => { if (hideTimer) clearTimeout(hideTimer); };
     }
-  }, [message]);
+  }, [message, isVisible, displayDuration]);
 
   if (!isVisible || !displayedMessage) return null;
 

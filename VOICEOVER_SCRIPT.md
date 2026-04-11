@@ -13,15 +13,17 @@ This document contains the complete list of dialogues for the **Cypher** guide w
 | **Training Ground** | This is where the action happens. Click 'Explore Modules' to find our training games, from vault-cracking to catching phishing scams. | `tour_step_1.mp3` |
 | **Rank & Progress** | You earn Experience Points (XP) for every successful mission. Leveling up shows the Academy you're ready for more advanced operations. | `tour_step_2.mp3` |
 | **Standings** | Keep an eye on the Global Standings. Seeing how other agents are performing is a great way to stay sharp! | `tour_step_3.mp3` |
-| **Ready for Action** | You're all set! Head over to the Modules and pick 'Crack the Vault' to begin your first training session. Good luck, Agent! | `tour_step_4.mp3` |
+| **Ready for Action** | You're all set! Head over to the Modules and begin your first training session | `tour_step_4.mp3` |
 
 ---
 
 ## 📂 Module 1: The Vault & Security Tutorials
 **Context:** Immersive guided tutorial for Entropy, OSINT, and Hashing factory.
 
-| Sequence / Trigger | Cypher's Dialogue (The Script) | Filename |
+| **Sequence / Trigger** | **Cypher's Dialogue (The Script)** | **Filename** |
 | :--- | :--- | :--- |
+| **Field Training** | Field training initialized. | `m1_field_training.mp3` |
+| **Mission Intro** | Move through the sector to reach the target vault. | `m1_into.mp3` |
 | **Entropy Intro 1** | Agent, look ahead. This is the Entropy Shield—the first layer of the vault's defense. | `m1_entropy_1.mp3` |
 | **Entropy Intro 2** | Entropy measures randomness. The more character types and length you add, the more unpredictable the password becomes for attackers. | `m1_entropy_2.mp3` |
 | **Entropy Intro 3** | When you enter the shield, tune the complexity until the 'Crack Time' reaches at least a century to pass. | `m1_entropy_3.mp3` |
@@ -66,7 +68,6 @@ This document contains the complete list of dialogues for the **Cypher** guide w
 | Context | Cypher's Dialogue (The Script) | Filename |
 | :--- | :--- | :--- |
 | **Briefing** | The network scanner is active. Watch the dashboard on the right. If you see a suspicious port, a very large file or repeated IP, add a block rule. | `m3_briefing.mp3` |
-| **Mission Tip** | Mission started! Tip: Block the unusual port numbers first, then look for repeating addresses. Use the 'Size' rule if you see a very large file. | `m3_start_tip.mp3` |
 | **Mission Success**| Mission success. You kept the service online and stopped the threats. Uploading your report. | `m3_success.mp3` |
 | **Mission Failure**| Uptime dropped too low. Replay the mission and block threats earlier (especially repeated IP bursts and odd ports). | `m3_fail.mp3` |
 | **Generic Ack** | Barrier active: threat neutralized. | `m3_barrier_locked.mp3` |
@@ -78,13 +79,13 @@ This document contains the complete list of dialogues for the **Cypher** guide w
 
 | Situation | Cypher's Dialogue (The Script) | Filename |
 | :--- | :--- | :--- |
-| **Starts Typing** | Initiating sequence. Enter the new administrative payload. | `pw_empty.mp3` |
-| **Numbers Only** | You're only using numbers. This is just a PIN, not a secure payload. | `pw_only_numbers.mp3` |
+| **Starts Typing** | Initiating sequence. Enter the new administrative payload. | `pw_init.mp3` |
+| **Numbers Only** | You're only using numbers. This is just a PIN, not a secure payload. | `pw_numbers.mp3` |
 | **Letters Only** | Letters alone won't cut it. Add digits or symbols to expand the character pool. | `pw_only_letters.mp3` |
-| **Repeating Chars**| Repeated characters detected. 'A A A' doesn't add real entropy. | `pw_repeats.mp3` |
+| **Repeating Chars**| Repeated characters detected. 'A A A' doesn't add real entropy. | `pw_repeat.mp3` |
 | **Sequential (abc)** | A numerical sequence? Hackers test '1 2 3' before they even start their coffee. | `pw_sequence.mp3` |
-| **Common Word** | Dictionary word detected! Scripts use massive lists of common words. Mix it up. | `pw_common_word.mp3` |
-| **Too Short** | Too short. An automated script could brute-force this in milliseconds. Keep typing. | `pw_too_short.mp3` |
+| **Common Word** | Dictionary word detected! Scripts use massive lists of common words. Mix it up. | `pw_dict.mp3` |
+| **Too Short** | Too short. An automated script could brute-force this in milliseconds. Keep typing. | `pw_short.mp3` |
 | **Moderate** | It's getting better, but a dedicated GPU rig could still crack it. Add more randomness. | `pw_moderate.mp3` |
 | **Strong** | Strong parameters detected. But as an Admin, we shouldn't settle for 'strong'. Push it further. | `pw_strong.mp3` |
 | **Unbreakable** | Massive entropy achieved. A network of supercomputers would need centuries to crack this. The vault is secure. | `pw_unbreakable.mp3` |

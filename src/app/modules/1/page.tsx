@@ -91,16 +91,16 @@ export default function CrackTheVault() {
   const handleBriefing = useCallback((tab: string) => {
     if (tab === "practice" && !hasBriefedPractice) {
       setCypherMessage({
-        text: "Field training initialized. Move through the sector to reach the target vault. Your inventory and skills from previous missions are active.",
+        text: "Field training initialized.",
         type: "info",
-        audioFile: "/audio/level-start.mp3",
+        audioFile: "/audio/m1_field_training.mp3",
       });
       setHasBriefedPractice(true);
     } else if (tab === "theory") {
       setCypherMessage({
         text: "Foundational data incoming. Study these parameters to master password entropy and the mechanics of encryption.",
         type: "info",
-        audioFile: "/audio/hub-theory-hover.mp3",
+        audioFile: undefined,
       });
     }
   }, [hasBriefedPractice]);
@@ -128,16 +128,17 @@ export default function CrackTheVault() {
     setCypherMessage({
       text: "Excellent work, Agent! You've absorbed the foundational knowledge. Theory mastered — now let's put it into practice in the field!",
       type: "success",
-      audioFile: "/audio/checkpoint-reached.mp3", // Using checkpoint-reached as a success sound
+      audioFile: undefined, // No specific audio file for this generic success
     });
   };
 
   const handleReachVault = () => {
     setGameState("vault");
     setCypherMessage({
-      text: "You are now in Admin Mode. Secure this compromised vault by constructing a password payload strong enough to resist modern brute-force dictionaries. I'll provide real-time feedback as you type.",
+      text: "You are now the System Admin. Secure this vault by constructing an unbreakable payload.",
       type: "info",
-      audioFile: "/audio/vault-reached.mp3",
+      audioFile: "/audio/m1_debrief_4.mp3",
+      isBlocking: true
     });
   };
 
@@ -150,126 +151,121 @@ export default function CrackTheVault() {
         {
           text: "Agent, look ahead. This is the Entropy Shield—the first layer of the vault's defense.",
           type: "info",
-          audioFile: "/audio/m1_entropy-1.mp3"
+          audioFile: "/audio/m1_entropy_1.mp3"
         },
         {
           text: "Entropy measures randomness. The more character types and length you add, the more unpredictable the password becomes for attackers.",
           type: "info",
-          audioFile: "/audio/m1_entropy-2.mp3"
+          audioFile: "/audio/m1_entropy_2.mp3"
         },
         {
           text: "When you enter the shield, tune the complexity until the 'Crack Time' reaches at least a century to pass.",
           type: "tip",
-          audioFile: "/audio/m1_entropy-3.mp3"
+          audioFile: "/audio/m1_entropy_3.mp3"
         }
       ],
       "entropy": [
         {
           text: "Shield Interface Active. Observe how adding symbols and numbers makes the crack time explode exponentially.",
           type: "info",
-          audioFile: "/audio/m1_entropy-active.mp3"
+          audioFile: "/audio/m1_entropy_active.mp3"
         }
       ],
       "warnings": [
         {
           text: "Warning: We've entered a zone of legacy passwords. Many users still use predictable patterns like names or birthdays.",
           type: "warning",
-          audioFile: "/audio/m1_warn-legacy.mp3"
+          audioFile: "/audio/m1_warn_legacy.mp3"
         },
         {
           text: "Attackers use OSINT (Open Source Intelligence) to scrape your public profiles and build custom wordlists based on your life.",
           type: "info",
-          audioFile: "/audio/m1_warn-osint.mp3"
+          audioFile: "/audio/m1_warn_osint.mp3"
         }
       ],
-      "se-intro": [
+      "se_intro": [
         {
           text: "Social Engineering Logic Trap. On the left, you'll see a target's private data profile.",
           type: "info",
-          audioFile: "/audio/m1_se-1.mp3"
+          audioFile: "/audio/m1_se_1.mp3"
         },
         {
           text: "Identify the keywords from their profile (pets, years, teams) to construct the guess that bypasses this wall.",
           type: "tip",
-          audioFile: "/audio/m1_se-2.mp3"
+          audioFile: "/audio/m1_se_2.mp3"
         }
       ],
       "social": [
         {
           text: "Social Engineering Logic Trap. On the left, you'll see a target's private data profile.",
           type: "info",
-          audioFile: "/audio/m1_se-1.mp3"
+          audioFile: "/audio/m1_se_1.mp3"
         },
         {
           text: "Identify the keywords from their profile (pets, years, teams) to construct the guess that bypasses this wall.",
           type: "tip",
-          audioFile: "/audio/m1_se-2.mp3"
+          audioFile: "/audio/m1_se_2.mp3"
         }
       ],
       "shield": [
         {
-          text: "This is a 2FA (Two-Factor Authentication) node. Even the strongest password can be stolen.",
+          text: "This is a 2FA (Two_Factor Authentication) node. Even the strongest password can be stolen.",
           type: "info",
-          audioFile: "/audio/m1_2fa-1.mp3"
+          audioFile: "/audio/m1_2fa_1.mp3"
         },
         {
-          text: "Multi-factor authentication adds a second physical or digital key, meaning a password alone isn't enough for a breach.",
+          text: "Multi_factor authentication adds a second physical or digital key, meaning a password alone isn't enough for a breach.",
           type: "success",
-          audioFile: "/audio/m1_2fa-2.mp3"
+          audioFile: "/audio/m1_2fa_2.mp3"
         }
       ],
       "hashing": [
         {
           text: "The Hashing Factory. We don't store passwords in plain text; we store their mathematical signatures (hashes).",
           type: "info",
-          audioFile: "/audio/m1_hash-1.mp3"
+          audioFile: "/audio/m1_hash_1.mp3"
         },
         {
-          text: "Your goal here is to 'Salt' the passwords. Salting adds unique data to every hash, preventing attackers from using pre-computed tables to crack them.",
+          text: "Your goal here is to 'Salt' the passwords. Salting adds unique data to every hash, preventing attackers from using pre_computed tables to crack them.",
           type: "tip",
-          audioFile: "/audio/m1_hash-2.mp3"
+          audioFile: "/audio/m1_hash_2.mp3"
         }
       ],
-      "entropy-success": [{
+      "entropy_success": [{
         text: "The field is stabilized. Moving to the next sector.",
         type: "success",
-        audioFile: "/audio/m1_success-generic-1.mp3"
+        audioFile: "/audio/m1_success_generic_1.mp3"
       }],
-      "se-success": [{
+      "se_success": [{
         text: "Profile flaws exploited. The path is clear.",
         type: "success",
-        audioFile: "/audio/m1_success-generic-2.mp3"
+        audioFile: "/audio/m1_success_generic_2.mp3"
       }],
-      "hash-success": [{
+      "hash_success": [{
         text: "Salting successful. The database is now secure.",
         type: "success",
-        audioFile: "/audio/m1_success-generic-3.mp3"
+        audioFile: "/audio/m1_success_generic_3.mp3"
       }],
-      "vault-intro": [{
+      "vault_intro": [{
         text: "The Mainframe entrance is within reach. Use your OSINT skills to finalize the breach.",
         type: "info",
-        audioFile: "/audio/m1_vault-intro.mp3"
+        audioFile: "/audio/m1_vault_intro.mp3"
       }],
-      "vault-breached-full": [
+      "vault-breached": [
         {
           text: "What you just executed is a targeted Dictionary Attack. By running OSINT, you scraped the target's personal data to generate a custom wordlist.",
           type: "info",
-          audioFile: "/audio/m1-debrief-1.mp3"
+          audioFile: "/audio/m1_debrief_1.mp3"
         },
         {
           text: "The brute-force script instantly found the match because the password was built from predictable personal details.",
           type: "info",
-          audioFile: "/audio/m1-debrief-2.mp3"
+          audioFile: "/audio/m1_debrief_2.mp3"
         },
         {
           text: "Lesson: Never use personal details like pet names, birth years, or favorite teams in your master passwords.",
           type: "warning",
-          audioFile: "/audio/m1-debrief-3.mp3"
-        },
-        {
-          text: "You are now the System Admin. Secure this vault by constructing an unbreakable payload.",
-          type: "success",
-          audioFile: "/audio/m1-debrief-4.mp3"
+          audioFile: "/audio/m1_debrief_3.mp3"
         }
       ]
     };
@@ -283,21 +279,21 @@ export default function CrackTheVault() {
       const first = seq[0];
       setCypherMessage({
         text: first.text,
-        audioFile: first.audio,
+        audioFile: first.audioFile,
         type: first.type,
         isBlocking: true
       });
     }
   }, [gameState]);
 
-  const handleNextDialogue = () => {
+  const handleNextDialogue = useCallback(() => {
     const nextIndex = currentDialogueIndex + 1;
     if (nextIndex < dialogueQueue.length) {
       setCurrentDialogueIndex(nextIndex);
       const next = dialogueQueue[nextIndex];
       setCypherMessage({
         text: next.text,
-        audioFile: next.audio,
+        audioFile: next.audioFile,
         type: next.type,
         isBlocking: true
       });
@@ -308,7 +304,7 @@ export default function CrackTheVault() {
       setCurrentDialogueIndex(0);
       setIsBlocked(false); // Resume game
     }
-  };
+  }, [currentDialogueIndex, dialogueQueue]);
 
   const handleCheckpoint = (id: string) => {
     // Checkpoint logic meta-tracking could go here
@@ -556,7 +552,15 @@ export default function CrackTheVault() {
               "Implement salting protocols at the Hashing Factory",
               "Construct a 100% Secure Entropy Payload"
             ]}
-            onAccept={() => setGameState("scrolling")}
+            onAccept={() => {
+              setGameState("scrolling");
+              setCypherMessage({
+                text: "Move through the sector to reach the target vault.",
+                type: "info",
+                audioFile: "/audio/m1_into.mp3",
+                isBlocking: true
+              });
+            }}
           />
         )}
 

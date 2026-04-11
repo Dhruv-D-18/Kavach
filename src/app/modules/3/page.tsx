@@ -158,8 +158,8 @@ export default function OperationIronWall() {
     if (phase !== "briefing") return;
     setGuideMessage({
       type: "info",
-      text: "The network scanner is active. Watch the dashboard on the right. If you see a suspicious port, a very large file size, or the same address repeating, add a rule to block it before it hits the servers.",
-      audioFile: "/audio/m3-briefing.mp3"
+      text: "The network scanner is active. Watch the dashboard on the right. If you see a suspicious port, a very large file or repeated IP, add a block rule.",
+      audioFile: "/audio/m3_briefing.mp3"
     });
   }, [phase]);
 
@@ -185,7 +185,7 @@ export default function OperationIronWall() {
     setGuideMessage({
       type: "success",
       text: `Barrier active: blocking ${selectedRuleType.toUpperCase()} ${ruleInputValue}.`,
-      audioFile: "/audio/m3-barrier-locked.mp3"
+      audioFile: "/audio/m3_barrier_locked.mp3"
     });
   };
 
@@ -274,14 +274,14 @@ export default function OperationIronWall() {
       setGuideMessage({
         type: "warning",
         text: "Uptime dropped too low. Replay the mission and block threats earlier (especially repeated IP bursts and odd ports).",
-        audioFile: "/audio/m3-fail.mp3"
+        audioFile: "/audio/m3_fail.mp3"
       });
     } else if (shouldWin) {
       setPhase("won");
       setGuideMessage({
         type: "success",
         text: "Mission success. You kept the service online and stopped the threats. Uploading your report.",
-        audioFile: "/audio/m3-success.mp3"
+        audioFile: "/audio/m3_success.mp3"
       });
       if (user) {
         const earned = Math.max(150, Math.floor(uptime * 2 + neutralized * 6));
@@ -309,11 +309,7 @@ export default function OperationIronWall() {
     setUptime(100);
     setNeutralized(0);
     setRules([]);
-    setGuideMessage({
-      type: "tip",
-      text: "Mission started! Tip: Block the unusual port numbers first, then look for repeating addresses. Use the 'Size' rule if you see a very large file.",
-      audioFile: "/audio/m3-start-tip.mp3"
-    });
+    setGuideMessage(null);
   };
 
   return (
@@ -323,7 +319,11 @@ export default function OperationIronWall() {
         message={guideMessage}
         isVisible={true}
         position="bottom-right"
-        displayDuration={(guideMessage?.text.startsWith("Barrier active") || phase === "briefing") ? 3500 : 6000}
+        displayDuration={
+          phase === "briefing" ? 13000 :
+            guideMessage?.text.startsWith("Barrier active") ? 3500 :
+              6000
+        }
       />
 
       {isLoading && (

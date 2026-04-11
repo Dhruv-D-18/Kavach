@@ -256,7 +256,11 @@ function AuthContent() {
             </span>
             <button
               type="button"
-              onClick={() => { setMode(mode === "login" ? "signup" : "login"); setError(""); }}
+              onClick={() => { 
+                setMode(mode === "login" ? "signup" : "login"); 
+                setError(""); 
+                setFormData({ username: "", email: "", password: "" }); 
+              }}
               className="text-primary hover:underline font-medium"
             >
               {mode === "login" ? "Sign up" : "Sign in"}

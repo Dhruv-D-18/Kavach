@@ -25,7 +25,7 @@ export function getCypherDialogue(analysis: PasswordAnalysis) {
     return {
       text: "Initiating sequence. Enter the new administrative payload.",
       type: "info",
-      audioFile: "/audio/pw-empty.mp3"
+      audioFile: "/audio/pw_init.mp3"
     };
   }
 
@@ -34,7 +34,7 @@ export function getCypherDialogue(analysis: PasswordAnalysis) {
     return {
       text: "You're only using numbers. This is just a PIN, not a secure payload.",
       type: "warning",
-      audioFile: "/audio/pw-only-numbers.mp3"
+      audioFile: "/audio/pw_numbers.mp3"
     };
   }
 
@@ -43,7 +43,7 @@ export function getCypherDialogue(analysis: PasswordAnalysis) {
     return {
       text: "Letters alone won't cut it. Add digits or symbols to expand the character pool.",
       type: "warning",
-      audioFile: "/audio/pw-only-letters.mp3"
+      audioFile: "/audio/pw_letters.mp3"
     };
   }
 
@@ -52,7 +52,7 @@ export function getCypherDialogue(analysis: PasswordAnalysis) {
     return {
       text: "Repeated characters detected. 'A A A' doesn't add real entropy.",
       type: "warning",
-      audioFile: "/audio/pw-repeats.mp3"
+      audioFile: "/audio/pw_repeat.mp3"
     };
   }
 
@@ -61,7 +61,7 @@ export function getCypherDialogue(analysis: PasswordAnalysis) {
     return {
       text: "A numerical sequence? Hackers test '1 2 3' before they even start their coffee.",
       type: "warning",
-      audioFile: "/audio/pw-sequence.mp3"
+      audioFile: "/audio/pw_sequence.mp3"
     };
   }
 
@@ -70,7 +70,7 @@ export function getCypherDialogue(analysis: PasswordAnalysis) {
     return {
       text: "Dictionary word detected! Scripts use massive lists of common words. Mix it up.",
       type: "warning",
-      audioFile: "/audio/pw-common-word.mp3"
+      audioFile: "/audio/pw_dict.mp3"
     };
   }
 
@@ -79,7 +79,7 @@ export function getCypherDialogue(analysis: PasswordAnalysis) {
     return {
       text: "Too short. An automated script could brute-force this in milliseconds. Keep typing.",
       type: "warning",
-      audioFile: "/audio/pw-too-short.mp3"
+      audioFile: "/audio/pw_short.mp3"
     };
   }
 
@@ -88,7 +88,7 @@ export function getCypherDialogue(analysis: PasswordAnalysis) {
     return {
       text: "It's getting better, but a dedicated GPU rig could still crack it. Add more randomness.",
       type: "info",
-      audioFile: "/audio/pw-moderate.mp3"
+      audioFile: "/audio/pw_moderate.mp3"
     };
   }
 
@@ -97,7 +97,7 @@ export function getCypherDialogue(analysis: PasswordAnalysis) {
     return {
       text: "Strong parameters detected. But as an Admin, we shouldn't settle for 'strong'. Push it further.",
       type: "success",
-      audioFile: "/audio/pw-strong.mp3"
+      audioFile: "/audio/pw_strong.mp3"
     };
   }
 
@@ -106,7 +106,7 @@ export function getCypherDialogue(analysis: PasswordAnalysis) {
     return {
       text: "Massive entropy achieved. A network of supercomputers would need centuries to crack this. The vault is secure.",
       type: "success",
-      audioFile: "/audio/pw-unbreakable.mp3"
+      audioFile: "/audio/pw_unbreakable.mp3"
     };
   }
 
@@ -122,7 +122,7 @@ export function getFirstTimeGuidance() {
   return {
     text: "Target reached. Enter the new administrative payload into the terminal to secure the vault.",
     type: "info",
-    audioFile: "/audio/pw-empty.mp3"
+    audioFile: "/audio/pw_init.mp3"
   };
 }
 
@@ -130,6 +130,6 @@ export function getSuccessGuidance(xp: number, attempts: number) {
   return {
     text: "Massive entropy achieved. A network of supercomputers would need centuries to crack this. The vault is secure.",
     type: "success",
-    audioFile: "/audio/pw-unbreakable.mp3"
+    audioFile: "/audio/pw_unbreakable.mp3"
   };
 }

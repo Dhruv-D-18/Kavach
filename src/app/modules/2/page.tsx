@@ -97,49 +97,49 @@ const TOUR_STEPS = [
     targetId: null,
     isBlocking: true,
     type: "info",
-    audioFile: "/audio/m2-tour-1.mp3"
+    audioFile: "/audio/m2_tour_1.mp3"
   },
   {
     text: "On the right is your Analysis Tools. First, pick a tool to start your inspection.",
     targetId: "workbench",
     isBlocking: true,
     type: "info",
-    audioFile: "/audio/m2-tour-2.mp3"
+    audioFile: "/audio/m2_tour_2.mp3"
   },
   {
     text: "The URL Microscope is very useful. It shows you where a link really goes. If the text says 'google.com' but the tool shows something else, it's a fake!",
     targetId: "tool-sniffer",
     isBlocking: true,
     type: "info",
-    audioFile: "/audio/m2-tour-3.mp3"
+    audioFile: "/audio/m2_tour_3.mp3"
   },
   {
     text: "You can also check the Certificate (SSL) to see if the website is verified, or check the 'Vibe' of the text to see if it sounds too pushy or scary.",
     targetId: "tools-secondary",
     isBlocking: true,
     type: "info",
-    audioFile: "/audio/m2-tour-4.mp3"
+    audioFile: "/audio/m2_tour_4.mp3"
   },
   {
     text: "When you find a clue, click the 'Evidence Selector' and then click on the suspicious part of the message to save it.",
     targetId: "tool-selector",
     isBlocking: true,
     type: "info",
-    audioFile: "/audio/m2-tour-5.mp3"
+    audioFile: "/audio/m2_tour_5.mp3"
   },
   {
     text: "Your clues appear here. Collect enough clues before making your final choice.",
-    targetId: "evidence-log",
+    targetId: "workbench",
     isBlocking: true,
     type: "info",
-    audioFile: "/audio/m2-tour-6.mp3"
+    audioFile: "/audio/m2_tour_6.mp3"
   },
   {
     text: "Finally, choose your choice: Real or Fake. If it's fake, we'll block it and you'll earn points. Take your time!",
-    targetId: "verdict-actions",
+    targetId: null,
     isBlocking: true,
     type: "info",
-    audioFile: "/audio/m2-tour-7.mp3"
+    audioFile: "/audio/m2_tour_7.mp3"
   }
 ];
 
@@ -258,19 +258,19 @@ export default function PhishingModule() {
       setCypherMessage({
         text: "Critical failure, Analyst. Our systems have been breached because of these missed cues. You must recalibrate and try again to secure the perimeter.",
         type: "warning",
-        audioFile: "/audio/m2-fail.mp3"
+        audioFile: "/audio/m2_fail.mp3"
       });
     } else if (results.correctCount === 1) {
       setCypherMessage({
         text: "Mixed results. You caught a major threat but let one slide. In the field, 'half right' equal a full breach. Re-examine your forensic markers.",
         type: "info",
-        audioFile: "/audio/m2-mixed.mp3"
+        audioFile: "/audio/m2_mixed.mp3"
       });
     } else {
       setCypherMessage({
         text: "Excellent forensic work, Analyst. You've successfully categorized the intercepts and protected the HQ. Your reputation in the Academy has grown.",
         type: "success",
-        audioFile: "/audio/m2-success.mp3"
+        audioFile: "/audio/m2_success.mp3"
       });
     }
   };

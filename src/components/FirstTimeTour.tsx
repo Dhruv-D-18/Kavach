@@ -21,41 +21,42 @@ const tourSteps: TourStep[] = [
     title: "Welcome to Kavach Academy!",
     description: "I'm Cypher, your cybersecurity mentor. Let me show you around this interactive learning platform where you'll master digital defense through hands-on missions.",
     highlightId: "tour-welcome",
-    audioFile: "/audio/tour-step-0.mp3",
+    audioFile: "/audio/tour_step_0.mp3",
     type: "info"
   },
   {
     title: "The Training Ground",
     description: "This is where the action happens. Click 'Explore Modules' to find our training games, from vault-cracking to catching phishing scams.",
     highlightId: "tour-explore",
-    audioFile: "/audio/tour-step-1.mp3",
+    audioFile: "/audio/tour_step_1.mp3",
     type: "info"
   },
   {
     title: "Your Rank & Progress",
     description: "You earn Experience Points (XP) for every successful mission. Leveling up shows the Academy you're ready for more advanced operations.",
     highlightId: "tour-features",
-    audioFile: "/audio/tour-step-2.mp3",
+    audioFile: "/audio/tour_step_2.mp3",
     type: "info"
   },
   {
     title: "Friendly Competition",
     description: "Keep an eye on the Global Standings. Seeing how other agents are performing is a great way to stay sharp!",
     highlightId: "tour-leaderboard",
-    audioFile: "/audio/tour-step-3.mp3",
+    audioFile: "/audio/tour_step_3.mp3",
     type: "info"
   },
   {
     title: "Ready for Action?",
-    description: "You're all set! Head over to the Modules and pick 'Crack the Vault' to begin your first training session. Good luck, Agent!",
+    description: "You're all set! Head over to the Modules and begin your first training session",
     highlightId: null,
-    audioFile: "/audio/tour-step-4.mp3",
+    audioFile: "/audio/tour_step_4.mp3",
     type: "success"
   }
 ];
 
 export function FirstTimeTour({ onComplete }: FirstTimeTourProps) {
   const [currentStep, setCurrentStep] = useState(0);
+  const [isExiting, setIsExiting] = useState(false);
   const current = tourSteps[currentStep];
 
   // Auto-scroll to highlighted elements
@@ -77,9 +78,12 @@ export function FirstTimeTour({ onComplete }: FirstTimeTourProps) {
       setCurrentStep(currentStep + 1);
     } else {
       console.log("Tour final step reached, completing...");
+      setIsExiting(true);
       onComplete();
     }
   };
+
+  if (isExiting) return null;
 
   return (
     <>

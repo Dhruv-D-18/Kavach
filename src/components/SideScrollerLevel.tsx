@@ -130,6 +130,7 @@ export function SideScrollerLevel({ onReachVault, onComplete, onCheckpoint, onDi
           if (!activeMinigame && Math.abs(characterPos.x - vaultPosition.x) < 100 && !hasReachedVault) {
             setHasReachedVault(true);
             setActiveMinigame("vault_terminal");
+            onComplete?.(); // Trigger Cypher's vault intro
           }
           break;
       }
