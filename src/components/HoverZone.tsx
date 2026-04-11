@@ -15,7 +15,8 @@ export function HoverZone({ children, tourId, className = "", delayMs = 600 }: H
   const timerRef = useRef<NodeJS.Timeout | null>(null);
 
   const handleMouseEnter = () => {
-    // Only activate hover events if logged in, tour not completed, and dialogue not already seen
+    // Legacy Hover Tour logic disabled to favor the new Premium Spotlight Tour
+    /*
     if (!user) return;
     if (profile?.tour_completed) return;
     if (seenDialogues.has(tourId)) return;
@@ -25,6 +26,7 @@ export function HoverZone({ children, tourId, className = "", delayMs = 600 }: H
     timerRef.current = setTimeout(() => {
       setActiveHoverTour(tourId);
     }, delayMs);
+    */
   };
 
   const handleMouseLeave = () => {

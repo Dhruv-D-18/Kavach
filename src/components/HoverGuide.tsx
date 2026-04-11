@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import { useUser } from "@/context/user-context";
+import Image from "next/image";
 
 const TOUR_DATA: Record<string, { audioFile: string; subtitle: string }> = {
   "hub-welcome": {
@@ -60,7 +61,7 @@ export function HoverGuide() {
 
     const timer = setTimeout(() => {
       setActiveHoverTour("hub-welcome");
-    }, 1200); // small delay after page loads
+    }, 1200);
 
     return () => clearTimeout(timer);
   }, [user, profile, seenDialogues, setActiveHoverTour]);
@@ -69,29 +70,21 @@ export function HoverGuide() {
   useEffect(() => {
     if (!activeHoverTour || !TOUR_DATA[activeHoverTour] || !audioRef.current) return;
     
-    // Don't replay dialogues the user has already seen
     if (seenDialogues.has(activeHoverTour) && activeHoverTour !== "hub-welcome") return;
 
     const { audioFile, subtitle } = TOUR_DATA[activeHoverTour];
 
-    // Stop current audio
     audioRef.current.pause();
-
-    // Mark as seen
     markDialogueSeen(activeHoverTour);
-
-    // Activate spotlight
     setSpotlightActive(true);
     setCurrentSubtitle(subtitle);
 
-    // Play audio
     audioRef.current.src = audioFile;
     audioRef.current.play().then(() => {
       setIsPlaying(true);
     }).catch(err => {
       console.error("Audio playback failed:", err);
       setCurrentSubtitle(subtitle);
-      // Auto-clear after 6s if audio fails
       setTimeout(() => {
         setCurrentSubtitle("");
         setSpotlightActive(false);
@@ -101,52 +94,73 @@ export function HoverGuide() {
 
   }, [activeHoverTour, seenDialogues, markDialogueSeen, setActiveHoverTour]);
 
-  // Only show for logged in, non-tour-complete users
   if (!user || profile?.tour_completed) return null;
 
   return (
     <>
-      {/* Spotlight Overlay - dims background when a dialogue is playing */}
+      <style dangerouslySetInnerHTML={{ __html: `
+        @keyframes hoverFloat {
+          0%, 100% { transform: translateY(0px); }
+          50% { transform: translateY(-10px); }
+        }
+        @keyframes hoverScanline {
+          0% { transform: translateY(-100%); opacity: 0; }
+          50% { opacity: 0.5; }
+          100% { transform: translateY(100%); opacity: 0; }
+        }
+        .animate-hover-float {
+          animation: hoverFloat 4s ease-in-out infinite;
+        }
+        .animate-hover-scanline {
+          animation: hoverScanline 2s linear infinite;
+        }
+      `}} />
+
       {spotlightActive && (
         <div
-          className="fixed inset-0 z-40 bg-black/60 backdrop-blur-[2px] pointer-events-none transition-all duration-500"
+          className="fixed inset-0 z-[5000] bg-black/60 backdrop-blur-[2px] pointer-events-none transition-all duration-500"
           aria-hidden="true"
         />
       )}
 
-      {/* Cypher Guide Panel - fixed to bottom-right, always above spotlight */}
-      <div className="fixed bottom-6 right-6 z-50 pointer-events-none flex flex-col items-end gap-3">
-        {/* Subtitle Bubble */}
+      <div className="fixed bottom-0 right-6 z-[6000] pointer-events-none flex flex-col items-end">
+        {/* HUD Subtitle Panel */}
         {currentSubtitle && (
-          <div className="max-w-lg bg-slate-900/95 border border-cyan-500/40 text-slate-200 p-5 rounded-2xl shadow-2xl shadow-cyan-500/20 backdrop-blur-md animate-in slide-in-from-bottom-4 fade-in">
+          <div className="max-w-lg mb-4 bg-slate-900/90 border-2 border-cyan-500/40 text-slate-200 p-5 rounded-2xl shadow-[0_0_30px_rgba(34,211,238,0.2)] backdrop-blur-md animate-in slide-in-from-bottom-8 fade-in duration-500 relative pointer-events-auto">
+            <div className="absolute -top-[2px] -left-[2px] w-4 h-4 border-t-2 border-l-2 border-cyan-400 rounded-tl-xl" />
+            <div className="absolute bottom-0 right-0 w-8 h-8 opacity-20 bg-gradient-to-br from-transparent to-cyan-500 rounded-br-xl" />
+            
+            <div className="flex items-center gap-2 mb-2 text-[10px] text-cyan-400 font-mono tracking-widest uppercase">
+              <span className="w-2 h-2 bg-cyan-500 rounded-full animate-pulse" />
+              Cypher Guide // Incoming Transmission
+            </div>
             <p className="text-[15px] font-medium leading-relaxed font-mono">
               &ldquo;{currentSubtitle}&rdquo;
             </p>
           </div>
         )}
 
-        {/* Cypher Avatar */}
-        <div className={`relative flex items-center justify-center w-24 h-24 rounded-full border-2 bg-slate-950 shadow-[0_0_20px_rgba(34,211,238,0.2)] transition-all duration-300 ${isPlaying ? 'border-cyan-400 shadow-[0_0_30px_rgba(34,211,238,0.4)]' : 'border-slate-700'}`}>
-          <div className="w-16 h-16 rounded-full bg-slate-800 flex items-center justify-center">
-            <span className="text-cyan-500 font-bold tracking-widest text-xs">CYPHER</span>
+        {/* Cypher Full Character Pop-up */}
+        <div className={`relative w-48 h-64 transition-all duration-700 ${currentSubtitle ? 'translate-y-0 opacity-100 scale-100' : 'translate-y-32 opacity-0 scale-90'}`}>
+          <div className="relative w-full h-full animate-hover-float">
+             <Image 
+                src="/images/cypher.png" 
+                alt="Cypher" 
+                fill 
+                className={`object-contain transition-all duration-500 ${isPlaying ? 'brightness-125 filter drop-shadow-[0_0_15px_rgba(34,211,238,0.6)]' : 'brightness-100'}`}
+                priority
+             />
+             
+             {/* Scanner Line Overlay */}
+             {isPlaying && (
+               <div className="absolute inset-0 overflow-hidden rounded-full pointer-events-none opacity-30">
+                 <div className="w-full h-1 bg-cyan-400 animate-hover-scanline" />
+               </div>
+             )}
           </div>
-
-          {/* Voice Waves */}
-          {isPlaying && (
-            <div className="absolute -bottom-2 flex items-center justify-center gap-[3px] bg-slate-900 px-3 py-1 rounded-full border border-cyan-500/50">
-              {[...Array(5)].map((_, i) => (
-                <div
-                  key={i}
-                  className="w-1 bg-cyan-400 rounded-full animate-pulse"
-                  style={{
-                    height: `${Math.random() * 10 + 6}px`,
-                    animationDelay: `${i * 0.15}s`,
-                    animationDuration: '0.5s'
-                  }}
-                />
-              ))}
-            </div>
-          )}
+          
+          {/* Base Platform Glow */}
+          <div className="absolute bottom-0 left-1/2 -translate-x-1/2 w-32 h-6 bg-cyan-500/30 blur-xl rounded-full -z-10" />
         </div>
       </div>
     </>

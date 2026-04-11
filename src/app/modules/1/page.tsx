@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useCallback } from "react";
 import { Navigation } from "@/components/Navigation";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -11,7 +11,6 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useUser } from "@/context/user-context";
 import { CypherGuide } from "@/components/CypherGuide";
 import { ModuleBriefing } from "@/components/ModuleBriefing";
-import { FirstTimeTour } from "@/components/FirstTimeTour";
 import { GameModeModule } from "@/components/GameModeModule";
 import { SideScrollerLevel } from "@/components/SideScrollerLevel";
 import {
@@ -51,8 +50,12 @@ export default function CrackTheVault() {
   // Cypher guidance system
   const [cypherMessage, setCypherMessage] = useState<{ text: string; type: "info" | "warning" | "success" | "tip"; audioFile?: string; isBlocking?: boolean } | null>(null);
   const [showCypher, setShowCypher] = useState(true);
-  const [gameState, setGameState] = useState<"scrolling" | "vault">("scrolling");
+  const [gameState, setGameState] = useState<"briefing" | "scrolling" | "vault" | "complete">("briefing");
   const [isBlocked, setIsBlocked] = useState(false);
+  
+  // Dialogue Sequencing
+  const [dialogueQueue, setDialogueQueue] = useState<any[]>([]);
+  const [currentDialogueIndex, setCurrentDialogueIndex] = useState(0);
 
   // Auth guard — redirect only after the session finishes loading
   useEffect(() => {
@@ -82,25 +85,50 @@ export default function CrackTheVault() {
     }
   }, [profile]);
 
+  const [hasBriefedPractice, setHasBriefedPractice] = useState(false);
+
+  // Handle briefing when switching tabs or on mount
+  const handleBriefing = useCallback((tab: string) => {
+    if (tab === "practice" && !hasBriefedPractice) {
+      setCypherMessage({
+        text: "Field training initialized. Move through the sector to reach the target vault. Your inventory and skills from previous missions are active.",
+        type: "info",
+        audioFile: "/audio/level-start.mp3",
+      });
+      setHasBriefedPractice(true);
+    } else if (tab === "theory") {
+      setCypherMessage({
+        text: "Foundational data incoming. Study these parameters to master password entropy and the mechanics of encryption.",
+        type: "info",
+        audioFile: "/audio/hub-theory-hover.mp3",
+      });
+    }
+  }, [hasBriefedPractice]);
+
+  // Trigger briefing on mount or after tour
+  useEffect(() => {
+    if (profile?.tour_completed && !showTour) {
+      // Small delay to let the page settle
+      const timer = setTimeout(() => handleBriefing("practice"), 1000);
+      return () => clearTimeout(timer);
+    }
+  }, [profile, showTour]);
+
   const handleTourComplete = async () => {
     setShowTour(false);
     await completeTour();
+    // Briefing will trigger via the useEffect above
   };
 
   const handleTheoryComplete = () => {
     if (theoryCompleted) return;
     setTheoryCompleted(true);
     updateScore(100); // 100 XP for reading the theory
-    // Play reward audio
-    if (typeof window !== "undefined") {
-      const audio = new Audio("/audio/hub-rewards-hover.mp3");
-      theoryAudioRef.current = audio;
-      audio.play().catch(() => {});
-    }
+    
     setCypherMessage({
       text: "Excellent work, Agent! You've absorbed the foundational knowledge. Theory mastered — now let's put it into practice in the field!",
       type: "success",
-      audioFile: "/audio/hub-theory-hover.mp3",
+      audioFile: "/audio/checkpoint-reached.mp3", // Using checkpoint-reached as a success sound
     });
   };
 
@@ -113,8 +141,177 @@ export default function CrackTheVault() {
     });
   };
 
+  // Dialogue Bridge: Maps internal game IDs to Cypher UI updates
+  const handleDialogue = useCallback((id: string) => {
+    if (gameState === "complete") return;
+
+    const sequences: Record<string, any[]> = {
+      "entropy-intro": [
+        {
+          text: "Agent, look ahead. This is the Entropy Shield—the first layer of the vault's defense.",
+          type: "info",
+          audioFile: "/audio/m1_entropy-1.mp3"
+        },
+        {
+          text: "Entropy measures randomness. The more character types and length you add, the more unpredictable the password becomes for attackers.",
+          type: "info",
+          audioFile: "/audio/m1_entropy-2.mp3"
+        },
+        {
+          text: "When you enter the shield, tune the complexity until the 'Crack Time' reaches at least a century to pass.",
+          type: "tip",
+          audioFile: "/audio/m1_entropy-3.mp3"
+        }
+      ],
+      "entropy": [
+        {
+          text: "Shield Interface Active. Observe how adding symbols and numbers makes the crack time explode exponentially.",
+          type: "info",
+          audioFile: "/audio/m1_entropy-active.mp3"
+        }
+      ],
+      "warnings": [
+        {
+          text: "Warning: We've entered a zone of legacy passwords. Many users still use predictable patterns like names or birthdays.",
+          type: "warning",
+          audioFile: "/audio/m1_warn-legacy.mp3"
+        },
+        {
+          text: "Attackers use OSINT (Open Source Intelligence) to scrape your public profiles and build custom wordlists based on your life.",
+          type: "info",
+          audioFile: "/audio/m1_warn-osint.mp3"
+        }
+      ],
+      "se-intro": [
+        {
+          text: "Social Engineering Logic Trap. On the left, you'll see a target's private data profile.",
+          type: "info",
+          audioFile: "/audio/m1_se-1.mp3"
+        },
+        {
+          text: "Identify the keywords from their profile (pets, years, teams) to construct the guess that bypasses this wall.",
+          type: "tip",
+          audioFile: "/audio/m1_se-2.mp3"
+        }
+      ],
+      "social": [
+        {
+          text: "Social Engineering Logic Trap. On the left, you'll see a target's private data profile.",
+          type: "info",
+          audioFile: "/audio/m1_se-1.mp3"
+        },
+        {
+          text: "Identify the keywords from their profile (pets, years, teams) to construct the guess that bypasses this wall.",
+          type: "tip",
+          audioFile: "/audio/m1_se-2.mp3"
+        }
+      ],
+      "shield": [
+        {
+          text: "This is a 2FA (Two-Factor Authentication) node. Even the strongest password can be stolen.",
+          type: "info",
+          audioFile: "/audio/m1_2fa-1.mp3"
+        },
+        {
+          text: "Multi-factor authentication adds a second physical or digital key, meaning a password alone isn't enough for a breach.",
+          type: "success",
+          audioFile: "/audio/m1_2fa-2.mp3"
+        }
+      ],
+      "hashing": [
+        {
+          text: "The Hashing Factory. We don't store passwords in plain text; we store their mathematical signatures (hashes).",
+          type: "info",
+          audioFile: "/audio/m1_hash-1.mp3"
+        },
+        {
+          text: "Your goal here is to 'Salt' the passwords. Salting adds unique data to every hash, preventing attackers from using pre-computed tables to crack them.",
+          type: "tip",
+          audioFile: "/audio/m1_hash-2.mp3"
+        }
+      ],
+      "entropy-success": [{
+        text: "The field is stabilized. Moving to the next sector.",
+        type: "success",
+        audioFile: "/audio/m1_success-generic-1.mp3"
+      }],
+      "se-success": [{
+        text: "Profile flaws exploited. The path is clear.",
+        type: "success",
+        audioFile: "/audio/m1_success-generic-2.mp3"
+      }],
+      "hash-success": [{
+        text: "Salting successful. The database is now secure.",
+        type: "success",
+        audioFile: "/audio/m1_success-generic-3.mp3"
+      }],
+      "vault-intro": [{
+        text: "The Mainframe entrance is within reach. Use your OSINT skills to finalize the breach.",
+        type: "info",
+        audioFile: "/audio/m1_vault-intro.mp3"
+      }],
+      "vault-breached-full": [
+        {
+          text: "What you just executed is a targeted Dictionary Attack. By running OSINT, you scraped the target's personal data to generate a custom wordlist.",
+          type: "info",
+          audioFile: "/audio/m1-debrief-1.mp3"
+        },
+        {
+          text: "The brute-force script instantly found the match because the password was built from predictable personal details.",
+          type: "info",
+          audioFile: "/audio/m1-debrief-2.mp3"
+        },
+        {
+          text: "Lesson: Never use personal details like pet names, birth years, or favorite teams in your master passwords.",
+          type: "warning",
+          audioFile: "/audio/m1-debrief-3.mp3"
+        },
+        {
+          text: "You are now the System Admin. Secure this vault by constructing an unbreakable payload.",
+          type: "success",
+          audioFile: "/audio/m1-debrief-4.mp3"
+        }
+      ]
+    };
+
+    const seq = sequences[id];
+    if (seq) {
+      setDialogueQueue(seq);
+      setCurrentDialogueIndex(0);
+      setIsBlocked(true); // Pause player movement
+      
+      const first = seq[0];
+      setCypherMessage({
+        text: first.text,
+        audioFile: first.audio,
+        type: first.type,
+        isBlocking: true
+      });
+    }
+  }, [gameState]);
+
+  const handleNextDialogue = () => {
+    const nextIndex = currentDialogueIndex + 1;
+    if (nextIndex < dialogueQueue.length) {
+      setCurrentDialogueIndex(nextIndex);
+      const next = dialogueQueue[nextIndex];
+      setCypherMessage({
+        text: next.text,
+        audioFile: next.audio,
+        type: next.type,
+        isBlocking: true
+      });
+    } else {
+      // End of sequence
+      setCypherMessage(null);
+      setDialogueQueue([]);
+      setCurrentDialogueIndex(0);
+      setIsBlocked(false); // Resume game
+    }
+  };
+
   const handleCheckpoint = (id: string) => {
-    // SideScrollerLevel now handles info blocks internally. No Cypher dialogue needed.
+    // Checkpoint logic meta-tracking could go here
   };
 
   const handleSkipGuide = () => {
@@ -245,6 +442,11 @@ export default function CrackTheVault() {
         setLevel(newLevel);
       }
 
+      // Transition to complete state after success
+      setTimeout(() => {
+        setGameState("complete");
+      }, 5000); // 5 second buffer to see the "Vault Secured" message
+
       // Update user's score in the database
       if (user) {
         updateScore(earnedXp);
@@ -315,11 +517,14 @@ export default function CrackTheVault() {
     <div className="min-h-screen bg-gradient-dark">
       <Navigation />
 
-      {/* First-Time Tour Overlay */}
-      {showTour && <FirstTimeTour onComplete={handleTourComplete} />}
-
       {/* Cypher Guide Component */}
-      <CypherGuide message={cypherMessage} isVisible={showCypher} onSkip={handleSkipGuide} />
+      <CypherGuide 
+        message={cypherMessage} 
+        isVisible={showCypher} 
+        onSkip={handleSkipGuide} 
+        onNext={handleNextDialogue}
+        position="bottom-right" 
+      />
 
 
       <main className="container mx-auto px-4 py-8 mt-16">
@@ -336,14 +541,30 @@ export default function CrackTheVault() {
             Crack the Vault
           </h1>
           <p className="text-muted-foreground">
-            Create an unbreakable password to unlock the vault and earn XP!
+            Master password security protocols and earn elite access.
           </p>
         </div>
 
-        <div className="grid lg:grid-cols-3 gap-6">
-          {/* Game Area */}
-          <div className="lg:col-span-2">
-            <Card className="glass-card border-primary/20">
+        {gameState === "briefing" && (
+          <ModuleBriefing 
+            title="Operation: Crack the Vault"
+            moduleName="Module 1: Password Security"
+            description="Intelligence suggests a legacy database is vulnerable to OSINT-driven dictionary attacks. You must intercept the target, scrape their public profile, and execute a brute-force script. Afterwards, you must calibrate the database with a high-entropy master payload."
+            objectives={[
+              "Bypass the Entropy Shield by tuning character pools",
+              "Execute a targeted Dictionary Attack using profile clues",
+              "Implement salting protocols at the Hashing Factory",
+              "Construct a 100% Secure Entropy Payload"
+            ]}
+            onAccept={() => setGameState("scrolling")}
+          />
+        )}
+
+        {gameState !== "briefing" && gameState !== "complete" && (
+        <div className="flex justify-center w-full">
+          {/* Game Area - Constrained to 5xl for Focused Cinematic Experience */}
+          <div className="w-full max-w-5xl">
+            <Card className="glass-card border-primary/20 shadow-2xl shadow-cyan-500/10">
               <CardHeader>
                 <CardTitle className="text-foreground flex items-center gap-2">
                   <Lock className="h-5 w-5 text-primary" />
@@ -354,7 +575,7 @@ export default function CrackTheVault() {
                 </CardDescription>
               </CardHeader>
               <CardContent>
-                <Tabs defaultValue="practice" className="w-full">
+                <Tabs defaultValue="practice" className="w-full" onValueChange={handleBriefing}>
                   <TabsList className="grid w-full grid-cols-2 mb-6">
                     <TabsTrigger value="theory">Theory</TabsTrigger>
                     <TabsTrigger value="practice">Practice</TabsTrigger>
@@ -557,6 +778,7 @@ export default function CrackTheVault() {
                         <SideScrollerLevel
                           onReachVault={handleReachVault}
                           onCheckpoint={handleCheckpoint}
+                          onDialogue={handleDialogue}
                           isBlocked={isBlocked}
                         />
 
@@ -578,7 +800,7 @@ export default function CrackTheVault() {
                       </div>
                     ) : (
                       // THE VAULT PASSWORD UI
-                      <div className="space-y-6">
+                      <div className="space-y-6 max-w-3xl mx-auto">
                         <div className="text-center mb-6">
                           <h3 className="text-2xl font-bold text-cyan-400 mb-2">Vault Admin Root</h3>
                           <p className="text-slate-400">Construct an unbreakable payload to secure the system.</p>
@@ -659,112 +881,39 @@ export default function CrackTheVault() {
               </CardContent>
             </Card>
           </div>
-
-          {/* Stats Panel */}
-          <div className="space-y-6">
-            <Card className="glass-card border-primary/20">
-              <CardHeader>
-                <CardTitle className="text-foreground flex items-center gap-2">
-                  <Trophy className="h-5 w-5 text-primary" />
-                  Your Progress
-                </CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                <div className="space-y-3">
-                  <div className="flex justify-between">
-                    <span className="text-muted-foreground">Level</span>
-                    <span className="font-bold text-primary">{level}</span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span className="text-muted-foreground">Total XP</span>
-                    <span className="font-bold text-primary">{score}</span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span className="text-muted-foreground">Current XP</span>
-                    <span className="font-bold text-primary">{xp}</span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span className="text-muted-foreground">Attempts</span>
-                    <span className="font-bold text-primary">{attempts}</span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span className="text-muted-foreground">Password Strength</span>
-                    <span className={`font-bold ${getStrengthColor()}`}>
-                      {strength}%
-                    </span>
-                  </div>
-                </div>
-
-                {/* Level Progress */}
-                <div className="pt-4 border-t border-border/50">
-                  <div className="flex justify-between mb-2">
-                    <span className="text-sm text-muted-foreground">Level {level} Progress</span>
-                    <span className="text-sm text-primary">{score % 500}/500 XP</span>
-                  </div>
-                  <Progress value={(score % 500) / 5} className="h-2" />
-                  <p className="text-xs text-muted-foreground mt-2">
-                    {500 - (score % 500)} XP needed for Level {level + 1}
-                  </p>
-                </div>
-
-                <div className="pt-4 border-t border-border/50">
-                  <h4 className="font-medium text-foreground mb-2">Password Tips</h4>
-                  <ul className="text-sm space-y-2">
-                    <li className="flex items-start gap-2">
-                      <CheckCircle2 className="h-4 w-4 text-green-500 mt-0.5" />
-                      <span className="text-muted-foreground">Use at least 12 characters</span>
-                    </li>
-                    <li className="flex items-start gap-2">
-                      <CheckCircle2 className="h-4 w-4 text-green-500 mt-0.5" />
-                      <span className="text-muted-foreground">Mix uppercase and lowercase</span>
-                    </li>
-                    <li className="flex items-start gap-2">
-                      <CheckCircle2 className="h-4 w-4 text-green-500 mt-0.5" />
-                      <span className="text-muted-foreground">Include numbers and symbols</span>
-                    </li>
-                    <li className="flex items-start gap-2">
-                      <XCircle className="h-4 w-4 text-red-500 mt-0.5" />
-                      <span className="text-muted-foreground">Avoid common words or patterns</span>
-                    </li>
-                    <li className="flex items-start gap-2">
-                      <XCircle className="h-4 w-4 text-red-500 mt-0.5" />
-                      <span className="text-muted-foreground">Avoid dictionary words (use passphrases instead)</span>
-                    </li>
-                  </ul>
-                </div>
-              </CardContent>
-            </Card>
-
-            <Card className="glass-card border-primary/20">
-              <CardHeader>
-                <CardTitle className="text-foreground flex items-center gap-2">
-                  <Shield className="h-5 w-5 text-primary" />
-                  Security Facts
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="space-y-4">
-                  <div className="p-3 rounded-lg bg-blue-500/10 border border-blue-500/30">
-                    <p className="text-sm text-blue-200">
-                      A password with 12+ characters including symbols would take centuries to crack with brute force.
-                    </p>
-                  </div>
-                  <div className="p-3 rounded-lg bg-purple-500/10 border border-purple-500/30">
-                    <p className="text-sm text-purple-200">
-                      80% of hacking-related breaches involve weak or stolen passwords.
-                    </p>
-                  </div>
-                  <div className="p-3 rounded-lg bg-cyan-500/10 border border-cyan-500/30">
-                    <p className="text-sm text-cyan-200">
-                      Using a password manager can generate and store unique passwords for all your accounts.
-                    </p>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-          </div>
         </div>
+        )}
+
+        {gameState === "complete" && (
+          <Card className="max-w-2xl mx-auto glass-card border-green-500 shadow-2xl shadow-green-500/20 animate-in zoom-in duration-500">
+            <CardHeader className="text-center pb-0">
+              <div className="w-20 h-20 bg-green-500/10 rounded-full flex items-center justify-center mx-auto mb-4 border-2 border-green-500">
+                <CheckCircle2 className="w-10 h-10 text-green-500" />
+              </div>
+              <CardTitle className="text-3xl font-bold text-green-400 uppercase tracking-widest">Mission Mastered</CardTitle>
+              <CardDescription className="text-slate-400 mt-2">Module 1: Password Security - Certified Complete</CardDescription>
+            </CardHeader>
+            <CardContent className="p-8 text-center space-y-6">
+              <div className="grid grid-cols-2 gap-4">
+                <div className="bg-slate-950 p-4 rounded-xl border border-slate-800">
+                  <div className="text-xs text-slate-500 uppercase font-bold mb-1">XP Earned</div>
+                  <div className="text-2xl font-bold text-yellow-400">+{Math.floor(strength * 1.5) + (strength === 100 ? 150 : 100)}</div>
+                </div>
+                <div className="bg-slate-950 p-4 rounded-xl border border-slate-800">
+                  <div className="text-xs text-slate-500 uppercase font-bold mb-1">Security Score</div>
+                  <div className="text-2xl font-bold text-cyan-400">{Math.round(strength)}%</div>
+                </div>
+              </div>
+              <div className="bg-slate-900 border border-slate-700 p-4 rounded-lg text-sm text-slate-300 italic">
+                "Agent, you've neutralized the database vulnerability. By understanding entropy and attack vectors, you are now equipped for advanced perimeter defense."
+              </div>
+              <Button onClick={() => router.push("/modules")} className="w-full h-14 gradient-primary text-xl font-bold">
+                Return to Modules
+              </Button>
+            </CardContent>
+          </Card>
+        )}
       </main>
     </div>
   );
-}
+}

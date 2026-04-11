@@ -190,12 +190,26 @@ export function UserProvider({ children }: { children: ReactNode }) {
 
   const completeTour = async () => {
     if (!user) return;
-    await (supabase as any)
-      .from("profiles")
-      .update({ tour_completed: true, updated_at: new Date().toISOString() })
-      .eq("id", user.id);
+    console.log("[Tour] Completing tour for user:", user.id);
+    
+    try {
+      const { error } = await (supabase as any)
+        .from("profiles")
+        .update({ 
+          tour_completed: true, 
+          updated_at: new Date().toISOString() 
+        })
+        .eq("id", user.id);
 
-    setProfile(prev => prev ? { ...prev, tour_completed: true } : null);
+      if (error) {
+        console.error("[Tour] Database update failed:", error);
+      } else {
+        console.log("[Tour] Database update successful.");
+        setProfile(prev => prev ? { ...prev, tour_completed: true } : null);
+      }
+    } catch (err) {
+      console.error("[Tour] Unexpected error during completion:", err);
+    }
   };
 
   const markDialogueSeen = (id: string) => {

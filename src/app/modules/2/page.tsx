@@ -84,8 +84,7 @@ const FALLBACK_SCENARIOS = [
     actual_link: "https://login.microsoftonline.com/common/oauth2/v2.0/authorize",
     red_flags: [
       { tool: "ssl" as const, location: "url" as const, description: "Corporate SSL: Microsoft Corporation (EV)" },
-      { tool: "sniffer" as const, location: "url" as const, description: "Authentication Authority: login.microsoftonline.com" },
-      { tool: "sentiment" as const, location: "body" as const, description: "Neutral Tone: Official Sign-in Portal" }
+      { tool: "sniffer" as const, location: "url" as const, description: "Authentication Authority: login.microsoftonline.com" }
     ],
     is_real: true
   }
@@ -94,39 +93,53 @@ const FALLBACK_SCENARIOS = [
 // Forensic Spotlight Tour Steps
 const TOUR_STEPS = [
   {
-    text: "Welcome to the Lab, Analyst. This is an incoming 'Intercept' transmission. You need to investigate it thoroughly using your Forensic Workbench.",
+    text: "Welcome, Agent. This is a suspicious message. Your job is simple: look for clues and decide if it's real or if it's a fake (phishing) trap.",
     targetId: null,
-    isBlocking: true
+    isBlocking: true,
+    type: "info",
+    audioFile: "/audio/m2-tour-1.mp3"
   },
   {
-    text: "On the right is your Analyst Workbench. These are your primary forensic tools. You MUST select a tool before you can scan the intercept.",
+    text: "On the right is your Analysis Tools. First, pick a tool to start your inspection.",
     targetId: "workbench",
-    isBlocking: true
+    isBlocking: true,
+    type: "info",
+    audioFile: "/audio/m2-tour-2.mp3"
   },
   {
-    text: "The URL Microscope (Sniffer) is your best friend. Use it to OBSERVE and reveal 'Hidden Destinations.' Note any mismatches.",
+    text: "The URL Microscope is very useful. It shows you where a link really goes. If the text says 'google.com' but the tool shows something else, it's a fake!",
     targetId: "tool-sniffer",
-    isBlocking: true
+    isBlocking: true,
+    type: "info",
+    audioFile: "/audio/m2-tour-3.mp3"
   },
   {
-    text: "SSL X-Rays and the Sentiment Engine are also for OBSERVATION. They reveal technical and psychological red flags without logging them.",
+    text: "You can also check the Certificate (SSL) to see if the website is verified, or check the 'Vibe' of the text to see if it sounds too pushy or scary.",
     targetId: "tools-secondary",
-    isBlocking: true
+    isBlocking: true,
+    type: "info",
+    audioFile: "/audio/m2-tour-4.mp3"
   },
   {
-    text: "When you are ready to confirm a finding, pick the EVIDENCE SELECTOR. While this is active, click on the mismatched elements to log them as evidence.",
+    text: "When you find a clue, click the 'Evidence Selector' and then click on the suspicious part of the message to save it.",
     targetId: "tool-selector",
-    isBlocking: true
+    isBlocking: true,
+    type: "info",
+    audioFile: "/audio/m2-tour-5.mp3"
   },
   {
-    text: "As you find red flags, they'll appear in your Evidence Log here. Collect enough evidence before making your final verdict.",
+    text: "Your clues appear here. Collect enough clues before making your final choice.",
     targetId: "evidence-log",
-    isBlocking: true
+    isBlocking: true,
+    type: "info",
+    audioFile: "/audio/m2-tour-6.mp3"
   },
   {
-    text: "Once certain, use the Verdict buttons. If it's Phishing, you'll need to follow Neutralization protocols to earn your XP. Good luck, Analyst.",
+    text: "Finally, choose your choice: Real or Fake. If it's fake, we'll block it and you'll earn points. Take your time!",
     targetId: "verdict-actions",
-    isBlocking: true
+    isBlocking: true,
+    type: "info",
+    audioFile: "/audio/m2-tour-7.mp3"
   }
 ];
 
@@ -139,6 +152,7 @@ export default function PhishingModule() {
   const [cypherMessage, setCypherMessage] = useState<{ text: string; type: "info" | "warning" | "success" | "tip"; audioFile?: string; isBlocking?: boolean } | null>(null);
   const [showTour, setShowTour] = useState(false);
   const [tourStep, setTourStep] = useState(0);
+  const [sessionResults, setSessionResults] = useState<{ correctCount: number; totalCount: number } | null>(null);
 
   useEffect(() => {
     if (!isLoading && !user) {
@@ -172,6 +186,25 @@ export default function PhishingModule() {
     fetchScenarios();
   }, []);
 
+  const handleRetry = async () => {
+    setLoading(true);
+    setGameState("game");
+    setSessionResults(null);
+    setCypherMessage(null);
+    
+    // Fetch fresh scenarios
+    try {
+      const { data } = await supabase.from('phishing_scenarios').select('*');
+      let pool = data && data.length > 0 ? data : FALLBACK_SCENARIOS;
+      const selection = [...pool].sort(() => Math.random() - 0.5).slice(0, 2);
+      setScenarios(selection);
+    } catch (err) {
+      setScenarios(FALLBACK_SCENARIOS.sort(() => Math.random() - 0.5).slice(0, 2));
+    } finally {
+      setLoading(false);
+    }
+  };
+
   const handleStartGame = async () => {
     if (user) await updateScore(50, { moduleId: 2, moduleName: "Phishing Lab (Theory)" }); // Theory completion
     setGameState("game");
@@ -196,26 +229,50 @@ export default function PhishingModule() {
     }
   };
 
-  const handleGameComplete = async (finalScore: number) => {
+  const handleGameComplete = async (results: { score: number; correctCount: number; totalCount: number }) => {
     setGameState("complete");
-    const normalizedScore = Math.floor(finalScore / 2); // 200 simulation points -> 100 XP
-    console.log("Phishing Lab Complete - Awarding XP:", normalizedScore + 100);
+    setSessionResults({ correctCount: results.correctCount, totalCount: results.totalCount });
+    
+    // XP Scaling Logic
+    // 0 correct = 50 XP (bonus for trying)
+    // 1 correct = 150 XP
+    // 2 correct = 250 XP
+    let xpToAward = 50;
+    if (results.correctCount === 1) xpToAward = 150;
+    if (results.correctCount === 2) xpToAward = 250;
+
     if (user) {
       try {
-        await updateScore(normalizedScore + 100, { 
+        await updateScore(xpToAward, { 
           moduleId: 2, 
-          moduleName: "Phishing Lab (Final)", 
-          accuracy: 100 
-        }); // 100 bonus for completion
-        console.log("XP Update successful");
+          moduleName: "Phishing Lab", 
+          accuracy: (results.correctCount / results.totalCount) * 100 
+        });
       } catch (err) {
         console.error("XP Update failed:", err);
       }
     }
-    setCypherMessage({
-      text: "Excellent forensic work, Analyst. You've successfully categorized the intercepts and protected the HQ. Your reputation in the Academy has grown.",
-      type: "success"
-    });
+
+    // Dynamic Cypher Dialogue
+    if (results.correctCount === 0) {
+      setCypherMessage({
+        text: "Critical failure, Analyst. Our systems have been breached because of these missed cues. You must recalibrate and try again to secure the perimeter.",
+        type: "warning",
+        audioFile: "/audio/m2-fail.mp3"
+      });
+    } else if (results.correctCount === 1) {
+      setCypherMessage({
+        text: "Mixed results. You caught a major threat but let one slide. In the field, 'half right' equal a full breach. Re-examine your forensic markers.",
+        type: "info",
+        audioFile: "/audio/m2-mixed.mp3"
+      });
+    } else {
+      setCypherMessage({
+        text: "Excellent forensic work, Analyst. You've successfully categorized the intercepts and protected the HQ. Your reputation in the Academy has grown.",
+        type: "success",
+        audioFile: "/audio/m2-success.mp3"
+      });
+    }
   };
 
   // Handle Loading Session or Fetching Scenarios
@@ -244,6 +301,7 @@ export default function PhishingModule() {
         }}
         onNext={showTour ? nextTourStep : undefined}
         isTour={showTour}
+        position="bottom-right"
       />
 
       <main className="container mx-auto px-4 py-8 mt-16 text-slate-100">
@@ -259,10 +317,10 @@ export default function PhishingModule() {
             <div className="hidden md:block">
                <div className="flex items-center gap-3 bg-slate-900 px-6 py-3 rounded-2xl border border-slate-700">
                   <Zap className="w-5 h-5 text-yellow-400" />
-                  <div>
-                     <div className="text-[10px] text-slate-500 font-bold uppercase">Potential XP</div>
-                     <div className="text-xl font-bold text-slate-100">250 XP</div>
-                  </div>
+                   <div>
+                      <div className="text-[10px] text-slate-500 font-bold uppercase">Potential XP</div>
+                      <div className="text-xl font-bold text-slate-100">250 XP</div>
+                   </div>
                </div>
             </div>
           </div>
@@ -312,19 +370,33 @@ export default function PhishingModule() {
               <div className="grid grid-cols-2 gap-4">
                 <div className="bg-slate-950 p-4 rounded-xl border border-slate-800">
                   <div className="text-xs text-slate-500 uppercase font-bold mb-1">XP Earned</div>
-                  <div className="text-2xl font-bold text-yellow-400">+250</div>
+                  <div className="text-2xl font-bold text-yellow-400">
+                    +{sessionResults?.correctCount === 2 ? 250 : sessionResults?.correctCount === 1 ? 150 : 50}
+                  </div>
                 </div>
                 <div className="bg-slate-950 p-4 rounded-xl border border-slate-800">
                   <div className="text-xs text-slate-500 uppercase font-bold mb-1">Accuracy</div>
-                  <div className="text-2xl font-bold text-cyan-400">100%</div>
+                  <div className="text-2xl font-bold text-cyan-400">
+                    {sessionResults ? Math.round((sessionResults.correctCount / sessionResults.totalCount) * 100) : 0}%
+                  </div>
                 </div>
               </div>
               <div className="bg-slate-900 border border-slate-700 p-4 rounded-lg text-sm text-slate-300 italic">
-                "Excellent work, Analyst. You've blocked a massive credential harvesting campaign. The Academy is safe... for now."
+                {sessionResults?.correctCount === 2 
+                  ? '"Excellent work, Analyst. You\'ve blocked a massive credential harvesting campaign. The Academy is safe... for now."'
+                  : sessionResults?.correctCount === 1 
+                  ? '"Half the threat is still a threat. You showed competence, but precision is what wins cyber wars. Analyze your errors and target perfection."'
+                  : '"This is a disaster, Analyst. You were completely deceived by the adversary. Return to theory immediately or try the simulation again."'}
               </div>
-              <Button onClick={() => router.push("/modules")} className="w-full h-14 gradient-primary text-xl font-bold">
-                Return to Modules
-              </Button>
+              
+              <div className="flex flex-col gap-3">
+                <Button onClick={handleRetry} className="w-full h-14 bg-cyan-600 hover:bg-cyan-500 text-white text-xl font-bold">
+                  {sessionResults?.correctCount === 2 ? "Run New Simulation" : "Retry Module Training"}
+                </Button>
+                <Button onClick={() => router.push("/modules")} variant="ghost" className="w-full text-slate-400 hover:text-white">
+                  Return to Modules
+                </Button>
+              </div>
             </CardContent>
           </Card>
         )}

@@ -9,10 +9,11 @@ import { BootAnimation } from "@/components/BootAnimation";
 import { useUser } from "@/context/user-context";
 import { HoverGuide } from "@/components/HoverGuide";
 import { HoverZone } from "@/components/HoverZone";
+import { FirstTimeTour } from "@/components/FirstTimeTour";
 import { useRouter } from "next/navigation";
 
 export default function Home() {
-  const { user, isLoading, hasBooted, setHasBooted } = useUser();
+  const { user, profile, isLoading, hasBooted, setHasBooted, completeTour } = useUser();
   const router = useRouter();
 
   // Show boot animation only once per session
@@ -42,12 +43,15 @@ export default function Home() {
 
   return (
     <div className="min-h-screen">
-      {/* HoverGuide shows Cypher dialogues and spotlight for logged-in new users */}
-      <HoverGuide />
+      {/* First-Time Tour Overlay for new users */}
+      {user && profile && !profile.tour_completed && (
+        <FirstTimeTour onComplete={completeTour} />
+      )}
+
       <Navigation />
 
       {/* Hero Section */}
-      <section className="pt-32 pb-20 px-4">
+      <section id="tour-welcome" className="pt-32 pb-20 px-4">
         <div className="container mx-auto text-center">
           <div className="inline-flex items-center justify-center w-24 h-24 mb-6 rounded-2xl">
             <img src="/kavach_logo.png" alt="Kavach Logo" className="w-30 h-30" />
@@ -65,6 +69,7 @@ export default function Home() {
 
           <HoverZone tourId="explore" delayMs={300} className="flex flex-col sm:flex-row gap-4 justify-center">
             <Button
+              id="tour-explore"
               size="lg"
               className="gradient-primary text-lg font-semibold gap-2"
               onClick={() => handleProtectedLink("/modules")}
@@ -85,7 +90,7 @@ export default function Home() {
 
       {/* Features Grid */}
       <HoverZone tourId="features">
-        <section className="py-20 px-4">
+        <section id="tour-features" className="py-20 px-4">
           <div className="container mx-auto">
             <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-6">
               {[
@@ -152,7 +157,12 @@ export default function Home() {
                 </li>
                 <li className="text-slate-400">
                   <span className="block text-primary text-[10px] font-mono mb-1">COMMUNICATIONS</span>
-                  <a href="mailto:dhruv.y.dharkar@outlook.com" className="hover:text-white transition-colors">dhruv.y.dharkar@outlook.com</a>
+                  <div className="space-y-1">
+                    <a href="mailto:dhruv.y.dharkar@outlook.com" className="block hover:text-white transition-colors">dhruv.y.dharkar@outlook.com</a>
+                    <a href="mailto:rijuyan.s.mallick@outlook.nuv.ac.in" className="block hover:text-white transition-colors">rijuyan.s.mallick@outlook.nuv.ac.in</a>
+                    <a href="mailto:priya.s.bhatt@outlook.nuv.ac.in" className="block hover:text-white transition-colors">priya.s.bhatt@outlook.nuv.ac.in</a>
+                    <a href="mailto:isha.r.rajput@outlook.nuv.ac.in" className="block hover:text-white transition-colors">isha.r.rajput@outlook.nuv.ac.in</a>
+                  </div>
                 </li>
               </ul>
             </div>

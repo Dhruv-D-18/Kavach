@@ -8,6 +8,7 @@ import { Database, Zap, Sparkles, CheckCircle2, AlertTriangle } from "lucide-rea
 
 interface HashingMinigameProps {
   onComplete: () => void;
+  onDialogue?: (id: string) => void;
 }
 
 // Simple deterministic hash function for visual effect
@@ -24,34 +25,24 @@ const generateSimpleHash = (text: string) => {
 
 const BASE_PASSWORDS = ["apple123", "qwerty!!", "supersecret", "ilovecats"];
 
-export function HashingMinigame({ onComplete }: HashingMinigameProps) {
+export function HashingMinigame({ onComplete, onDialogue }: HashingMinigameProps) {
   const [users, setUsers] = useState([
     { id: 1, name: "User A", password: "", salt: "" },
     { id: 2, name: "User B", password: "", salt: "" }
   ]);
   const [step, setStep] = useState(1); // 1: Initial Identical Hashes, 2: Solving/Salting added, 3: Success
-  const audioRef = useRef<HTMLAudioElement | null>(null);
 
-  const playAudio = (src: string) => {
-    if (audioRef.current) {
-      audioRef.current.pause();
-    }
-    audioRef.current = new Audio(src);
-    audioRef.current.play().catch(err => console.error("Audio playback failed:", err));
-  };
-
-  // Play intro on mount
+  // Trigger intro on mount
   useEffect(() => {
-    playAudio("/audio/hash-intro.mp3");
-    return () => audioRef.current?.pause();
-  }, []);
+    // onDialogue?.("hash-intro"); // Centrally managed by the level instead
+  }, [onDialogue]);
 
-  // Success audio trigger
+  // Success dialogue trigger
   useEffect(() => {
     if (step === 3) {
-      playAudio("/audio/hash-success.mp3");
+      onDialogue?.("hash-success");
     }
-  }, [step]);
+  }, [step, onDialogue]);
 
   useEffect(() => {
     // Pick a random base password for both users
@@ -84,27 +75,29 @@ export function HashingMinigame({ onComplete }: HashingMinigameProps) {
           The Hashing Factory
         </CardTitle>
         <CardDescription className="text-slate-400 mt-2">
-          Cypher: "These users chose the same password, so their hashes match exactly! Hackers love this. Enter some random 'Salt' for each user to make their final hashes completely unique."
+          <div className="space-y-2">
+            <div className="text-slate-200 font-semibold">How to play</div>
+            <ul className="list-disc pl-5 space-y-1 text-slate-300">
+              <li>Type a short salt for User A.</li>
+              <li>Type a different salt for User B.</li>
+              <li>Press Verify when hashes no longer match.</li>
+            </ul>
+          </div>
         </CardDescription>
       </CardHeader>
       
       <CardContent className="space-y-6">
-        
-        {/* Conveyor Belt View */}
         <div className="bg-black/50 p-6 rounded-lg border border-slate-700 relative">
-          
           <div className="space-y-8">
             {users.map((u, i) => (
               <div key={u.id} className="flex items-center gap-4 text-sm relative">
                 <div className="w-16 font-bold text-slate-400">{u.name}</div>
-                
-                {/* Input block */}
                 <div className="flex bg-slate-800 border border-slate-600 rounded-md font-mono items-center relative shadow-inner overflow-hidden">
                   <div className="text-white px-4 py-3 bg-slate-900 border-r border-slate-700">
                     {u.password}
                   </div>
                   <Input 
-                    placeholder="add salt..."
+                    placeholder="Type salt..."
                     value={u.salt}
                     onChange={(e) => handleSaltChange(u.id, e.target.value)}
                     className="bg-transparent border-none text-yellow-400 h-full placeholder:text-slate-600 focus-visible:ring-0 max-w-[120px]"
@@ -113,14 +106,10 @@ export function HashingMinigame({ onComplete }: HashingMinigameProps) {
                   />
                   {u.salt && <Sparkles className="absolute right-2 top-1/2 -translate-y-1/2 w-3 h-3 text-yellow-500/50" />}
                 </div>
-
-                {/* Arrow / Grinder */}
                 <div className="flex flex-col items-center shrink-0 px-2 text-slate-500 text-[10px]">
                   <span>SHA-256</span>
                   <Zap className={`h-5 w-5 mt-1 ${hashes[i] ? 'text-yellow-400' : 'text-slate-600'}`} />
                 </div>
-
-                {/* Output Hash block */}
                 <div className={`flex-1 border px-4 py-3 rounded-md font-mono tracking-widest transition-all duration-300 ${
                   hashes[i] 
                     ? identicalHashes 
@@ -133,7 +122,6 @@ export function HashingMinigame({ onComplete }: HashingMinigameProps) {
               </div>
             ))}
           </div>
-
           {!identicalHashes && users[0].salt && users[1].salt && step < 3 && (
             <div className="mt-8 flex justify-end animate-in fade-in slide-in-from-bottom-2">
               <Button onClick={handleVerify} className="bg-yellow-600 hover:bg-yellow-500 text-white font-bold px-8">
@@ -141,16 +129,13 @@ export function HashingMinigame({ onComplete }: HashingMinigameProps) {
               </Button>
             </div>
           )}
-
           {identicalHashes && (
              <div className="absolute inset-x-0 -bottom-3 mx-auto w-max bg-red-950/90 border border-red-500 text-red-400 text-xs px-4 py-1.5 rounded-full flex items-center gap-2 shadow-xl animate-bounce">
                <AlertTriangle className="w-3 h-3" />
-               Warning: Identical Hashes Detected. System Vulnerable!
+               Warning: Identical Hashes Detected!
              </div>
           )}
-
         </div>
-
       </CardContent>
 
       {step === 3 && (
@@ -159,15 +144,14 @@ export function HashingMinigame({ onComplete }: HashingMinigameProps) {
               <CheckCircle2 className="h-8 w-8 shrink-0" />
               <div>
                 <h4 className="font-bold">Hashes Secured</h4>
-                <p className="text-sm opacity-90">Excellent! By appending unique salts, even identical passwords output completely different hashes. Rainbow Table attacks are now useless.</p>
+                <p className="text-sm opacity-90">Same password, different salts → different hashes. Salting prevented common attacks.</p>
               </div>
            </div>
            <Button onClick={onComplete} className="w-full bg-cyan-600 hover:bg-cyan-500 text-white font-bold py-6">
-             Upload to Server & Continue
+             Continue mission
            </Button>
         </CardFooter>
       )}
-
     </Card>
   );
 }

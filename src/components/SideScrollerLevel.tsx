@@ -16,19 +16,28 @@ interface SideScrollerProps {
   onReachVault?: () => void;
   onComplete?: () => void;
   onCheckpoint?: (id: string) => void;
+  onDialogue?: (id: string) => void;
   isBlocked?: boolean;
 }
 
 const CHECKPOINTS = [
-  { id: "firewall", title: "🔒 Firewall Info", type: "info", x: 180, color: "from-blue-600 to-cyan-500", shadow: "shadow-cyan-500/50", msg: "Firewalls block unauthorized access but allow outbound communication. They are the first line of defense against botnets." },
+  {
+    id: "entropy-intro",
+    title: "🎲 What is Entropy?",
+    type: "info",
+    x: 180,
+    color: "from-blue-600 to-cyan-500",
+    shadow: "shadow-cyan-500/50",
+    msg: "Entropy = how unpredictable a password is.\nMore length and more character types (letters/numbers/symbols) create far more combinations.\nGuessing becomes impractical when combinations explode.\n---\nNext you will open the Entropy Shield.\nYou will tune two sliders: character pool and length.\nGoal: make “Rough time to crack” reach about 100+ years."
+  },
   { id: "entropy", title: "🎲 Entropy Shield", type: "minigame", x: 350, color: "from-green-600 to-emerald-500", shadow: "shadow-green-500/50" },
-  { id: "warnings", title: "⚠️ Weak Passwords", type: "info", x: 550, color: "from-yellow-600 to-orange-500", shadow: "shadow-yellow-500/50", msg: "A weak password can be cracked in seconds using dictionary attacks. Stop relying on 'admin123'." },
+  { id: "warnings", title: "⚠️ Weak Passwords", type: "info", x: 550, color: "from-yellow-600 to-orange-500", shadow: "shadow-yellow-500/50", msg: "Weak passwords are short or predictable.\nAttackers can guess them quickly using automated tools.\n---\nNext, you will see how public profile clues get reused in passwords.\nIn real life, avoid names, pet names, birthdays, and years in passwords." },
   { id: "social", title: "🎣 Social Eng Trap", type: "minigame", x: 750, color: "from-purple-600 to-pink-500", shadow: "shadow-purple-500/50" },
-  { id: "shield", title: "🛡️ 2FA Shield", type: "info", x: 950, color: "from-indigo-600 to-blue-500", shadow: "shadow-blue-500/50", msg: "Two-Factor Authentication (2FA) adds a second layer of security. Even if your password is stolen, the hackers can't get in." },
+  { id: "shield", title: "🛡️ 2FA Shield", type: "info", x: 950, color: "from-indigo-600 to-blue-500", shadow: "shadow-blue-500/50", msg: "Two‑factor authentication (2FA) adds a second step to login.\nIt is your password plus a code from an app, SMS, or a security key.\n---\nIf someone steals your password, 2FA can still stop them.\nTurn on 2FA for important accounts whenever possible." },
   { id: "hashing", title: "⚙️ Hashing Factory", type: "minigame", x: 1100, color: "from-pink-600 to-rose-500", shadow: "shadow-rose-500/50" },
 ];
 
-export function SideScrollerLevel({ onReachVault, onComplete, onCheckpoint, isBlocked }: SideScrollerProps) {
+export function SideScrollerLevel({ onReachVault, onComplete, onCheckpoint, onDialogue, isBlocked }: SideScrollerProps) {
   const [characterPos, setCharacterPos] = useState<Position>({ x: 50, y: 400 });
   const [direction, setDirection] = useState<'left' | 'right'>('right');
   const [isMoving, setIsMoving] = useState(false);
@@ -36,20 +45,10 @@ export function SideScrollerLevel({ onReachVault, onComplete, onCheckpoint, isBl
   const [hasReachedVault, setHasReachedVault] = useState(false);
   const [triggeredCheckpoints, setTriggeredCheckpoints] = useState<Set<string>>(new Set());
   const [activeMinigame, setActiveMinigame] = useState<string | null>(null);
-  const audioRef = useRef<HTMLAudioElement | null>(null);
 
-  const playAudio = (src: string) => {
-    if (audioRef.current) {
-      audioRef.current.pause();
-    }
-    audioRef.current = new Audio(src);
-    audioRef.current.play().catch(err => console.error("Audio playback failed:", err));
-  };
-
-  // Play level start on mount
+  // Dialogue triggers are now handled by the parent HUD.
   useEffect(() => {
-    playAudio("/audio/level-start.mp3");
-    return () => audioRef.current?.pause();
+    // Component cleanup
   }, []);
 
   // Level dimensions
@@ -73,11 +72,23 @@ export function SideScrollerLevel({ onReachVault, onComplete, onCheckpoint, isBl
 
       // Check for checkpoints crossed (only trigger going right)
       if (dx > 0) {
+        // Warning trigger (before reaching)
+        const upcomingCheckpoint = CHECKPOINTS.find(cp =>
+          !triggeredCheckpoints.has(cp.id) && 
+          newX > cp.x - 100 && 
+          newX < cp.x
+        );
+        if (upcomingCheckpoint) {
+             // We can use a ref to prevent spamming audio
+             // I will leave this for now or just play on interaction
+        }
+
         const passedCheckpoint = CHECKPOINTS.find(cp =>
           prev.x < cp.x && newX >= cp.x && !triggeredCheckpoints.has(cp.id)
         );
 
         if (passedCheckpoint) {
+          onDialogue?.(passedCheckpoint.id);
           setTriggeredCheckpoints(prevSet => new Set(prevSet).add(passedCheckpoint.id));
           onCheckpoint?.(passedCheckpoint.id);
           
@@ -86,8 +97,6 @@ export function SideScrollerLevel({ onReachVault, onComplete, onCheckpoint, isBl
           // Block them slightly before the checkpoint until they solve/acknowledge it
           return { x: passedCheckpoint.x - 5, y: prev.y };
         }
-
-
       }
 
       return { x: newX, y: prev.y };
@@ -257,7 +266,8 @@ export function SideScrollerLevel({ onReachVault, onComplete, onCheckpoint, isBl
 
       {/* Modal Overlay for Active Minigame or Info Checkpoint */}
       {activeMinigame && (
-        <div className="absolute inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4">
+        <div className="absolute inset-0 z-50 bg-black/80 backdrop-blur-sm overflow-y-auto">
+          <div className="min-h-full w-full flex items-center justify-center p-4 py-10">
           
           {/* Info Types */}
           {activeCpObj?.type === "info" && (
@@ -269,15 +279,16 @@ export function SideScrollerLevel({ onReachVault, onComplete, onCheckpoint, isBl
           )}
 
           {/* Minigame Types */}
-          {activeMinigame === "entropy" && <EntropyMinigame onComplete={handleMinigameComplete} />}
-          {activeMinigame === "social" && <SocialEngineeringMinigame onComplete={handleMinigameComplete} />}
-          {activeMinigame === "hashing" && <HashingMinigame onComplete={handleMinigameComplete} />}
+          {activeMinigame === "entropy" && <EntropyMinigame onComplete={handleMinigameComplete} onDialogue={onDialogue} />}
+          {activeMinigame === "social" && <SocialEngineeringMinigame onComplete={handleMinigameComplete} onDialogue={onDialogue} />}
+          {activeMinigame === "hashing" && <HashingMinigame onComplete={handleMinigameComplete} onDialogue={onDialogue} />}
           
           {/* Terminal Vault Ending Sequence */}
           {activeMinigame === "vault_terminal" && (
-            <TerminalVault onComplete={() => { handleMinigameComplete(); onReachVault?.(); onComplete?.(); }} />
+            <TerminalVault onComplete={() => { handleMinigameComplete(); onReachVault?.(); onComplete?.(); }} onDialogue={onDialogue} />
           )}
 
+          </div>
         </div>
       )}
     </div>

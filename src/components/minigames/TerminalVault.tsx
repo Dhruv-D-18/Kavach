@@ -7,9 +7,11 @@ import { Terminal, Shield, CheckCircle2, ChevronRight, Search, FileText, Zap } f
 
 interface TerminalVaultProps {
   onComplete: () => void;
+  onDialogue?: (id: string) => void;
 }
 
-export function TerminalVault({ onComplete }: TerminalVaultProps) {
+export function TerminalVault({ onComplete, onDialogue }: TerminalVaultProps) {
+  const [introStep, setIntroStep] = useState(0); // 0/1 = instruction pages, 2 = play
   const [history, setHistory] = useState<string[]>([
     "KavachOS v2.4.1 (Admin Mode)",
     "Type command or use the Toolkit to interact."
@@ -20,25 +22,38 @@ export function TerminalVault({ onComplete }: TerminalVaultProps) {
   
   // Progress state: 0=start, 1=osint done, 2=wordlist done, 3=cracked
   const [step, setStep] = useState(0); 
+  const [scenarios, setScenarios] = useState<any[]>([]);
+  const [currentScenario, setCurrentScenario] = useState<any>(null);
+  const [isFinishing, setIsFinishing] = useState(false);
 
   const terminalRef = useRef<HTMLDivElement>(null);
-  const audioRef = useRef<HTMLAudioElement | null>(null);
 
-  const playAudio = (src: string) => {
-    if (audioRef.current) {
-      audioRef.current.pause();
-    }
-    audioRef.current = new Audio(src);
-    audioRef.current.play().catch(err => console.error("Audio playback failed:", err));
-  };
-
-  // Play intro on mount
+  // Trigger intro on mount and fetch scenarios
   useEffect(() => {
-    playAudio("/audio/vault-intro.mp3");
-    return () => {
-      audioRef.current?.pause();
+    onDialogue?.("vault-intro");
+
+    const fetchScenarios = async () => {
+      try {
+        const { data } = await import("@/lib/supabase").then(m => m.supabase.from("password_scenarios").select("*"));
+        if (data && data.length > 0) {
+          setScenarios(data);
+          setCurrentScenario(data[Math.floor(Math.random() * data.length)]);
+        } else {
+          // Fallback
+          setCurrentScenario({
+            name: "John Doe",
+            pet_name: "Buster",
+            birth_year: "1985",
+            favorite_team: "Lakers",
+            correct_password: "Buster1985"
+          });
+        }
+      } catch (err) {
+        console.error("Failed to fetch scenarios:", err);
+      }
     };
-  }, []);
+    fetchScenarios();
+  }, [onDialogue]);
 
   useEffect(() => {
     if (terminalRef.current) {
@@ -55,16 +70,16 @@ export function TerminalVault({ onComplete }: TerminalVaultProps) {
         setHistory(prev => [...prev, "Target already analyzed."]);
       } else {
         setHistory(prev => [...prev, "[*] Scraping public profile..."]);
-        playAudio("/audio/vault-osint.mp3");
+        onDialogue?.("vault-osint");
         
         // Wait for Cypher to say "Data cached" (approx 2s)
         setTimeout(() => {
           setHistory(prev => [
             ...prev, 
-            "Target Name: John Doe",
-            "Pet Name: <span class='text-yellow-400 font-bold'>Buster</span>",
-            "Significant Year: <span class='text-yellow-400 font-bold'>1985</span>",
-            "Favorite Sports Team: Lakers",
+            `Target Name: ${currentScenario?.name || 'John Doe'}`,
+            `Pet Name: <span class='text-yellow-400 font-bold'>${currentScenario?.pet_name || currentScenario?.vulnerabilities?.[0] || 'Buster'}</span>`,
+            `Significant Year: <span class='text-yellow-400 font-bold'>${currentScenario?.birth_year || currentScenario?.vulnerabilities?.[1] || '1985'}</span>`,
+            `Special Interest: <span class='text-yellow-400 font-bold'>${currentScenario?.favorite_team || currentScenario?.vulnerabilities?.[2] || 'Lakers'}</span>`,
             "[*] OSINT complete. Data cached."
           ]);
           setStep(1);
@@ -76,7 +91,7 @@ export function TerminalVault({ onComplete }: TerminalVaultProps) {
       } else if (step >= 2) {
          setHistory(prev => [...prev, "Wordlist already generated."]);
       } else {
-        playAudio("/audio/vault-dictionary.mp3");
+        onDialogue?.("vault-dictionary");
         setHistory(prev => [
           ...prev,
           "[*] Compiling dictionary based on OSINT...",
@@ -102,15 +117,20 @@ export function TerminalVault({ onComplete }: TerminalVaultProps) {
   const startHackingSequence = () => {
     setIsHacking(true);
     setHistory(prev => [...prev, "[**] INITIALIZING BRUTE FORCE ATTACK...", "Target: 192.168.1.1 (VAULT)"]);
-    playAudio("/audio/vault-bruteforce.mp3");
+    onDialogue?.("vault-bruteforce");
     
     // Simulating generated wordlist combinations based on OSINT
+    const targetPw = currentScenario?.correct_password || "Buster1985";
     const wordlistGuesses = [
-      "john123", "doejohn", "LakersFan", "1985john", "BusterDog",
-      "john1985", "lakers1985", "Buster123!", "LakersBuster", "doe1985",
-      "1985Lakers", "john_doe", "Buster!985", "BusterLakers", "JOHN1985",
-      "lakers_fan", "Buster1980", "1985buster", "Buster_1985"
-    ];
+      "admin123", "password", "security", "123456", 
+      ...(currentScenario?.vulnerabilities || ["Buster", "1985", "Lakers"]).map(v => `${v}123`),
+      ...(currentScenario?.vulnerabilities || ["Buster", "1985", "Lakers"]).map(v => `${v}${targetPw.slice(-2)}`),
+      targetPw
+    ].sort(() => Math.random() - 0.5);
+
+    // Make sure the target is near the end for dramatic effect
+    const finalGuesses = wordlistGuesses.filter(g => g !== targetPw).slice(0, 15);
+    finalGuesses.push(targetPw);
 
     let attempts = 0;
     // We want the match to hit roughly when Cypher says "There... match found" 
@@ -124,29 +144,31 @@ export function TerminalVault({ onComplete }: TerminalVaultProps) {
         clearInterval(interval);
         setHistory(prev => [
           ...prev, 
-           "<span class='text-green-400 font-bold'>=========================================</span>",
-          "<span class='text-green-400 font-bold'>[SUCCESS] MATCH FOUND: Buster1985</span>",
-           "<span class='text-green-400 font-bold'>=========================================</span>",
-          "Access Granted. Disabling mainframe security locks."
+          "<span class='text-green-400 font-bold'>=========================================</span>",
+          `<span class='text-green-400 font-bold'>[SUCCESS] MATCH FOUND: ${targetPw}</span>`,
+          "<span class='text-green-400 font-bold'>=========================================</span>",
+          "Access Granted. Disabling mainframe security locks.",
+          "<span class='text-red-500 font-black animate-pulse text-lg'>!!! VAULT COMPROMISED !!!</span>",
+          "Protocol: Breach confirmed. Awaiting Admin acknowledgement..."
         ]);
         
-        setTimeout(() => {
-          playAudio("/audio/vault-breached.mp3");
-          setUnlocked(true);
-          setStep(3);
-        }, 1500);
+        onDialogue?.("vault-breached");
+        setIsFinishing(true);
+        setStep(3);
       }
     }, 300); // Slower interval so 20 attempts take ~6 seconds
   };
 
   const onSubmit = (e: React.FormEvent) => {
     e.preventDefault();
+    if (introStep < 2) return;
     if (!isHacking && !unlocked && input) {
       handleCommand(input);
     }
   };
 
   const triggerToolkit = (cmd: string) => {
+    if (introStep < 2) return;
     if (!isHacking && !unlocked) {
       setInput(cmd);
       handleCommand(cmd);
@@ -164,37 +186,51 @@ export function TerminalVault({ onComplete }: TerminalVaultProps) {
     return (
       <div className="w-full max-w-4xl bg-slate-900 border-red-500 shadow-2xl shadow-red-500/20 text-center p-12 rounded-xl animate-in zoom-in duration-500">
          <Shield className="w-24 h-24 text-red-500 mx-auto mb-6 animate-pulse" />
-         <h2 className="text-4xl font-bold text-red-500 mb-4 tracking-widest">VAULT COMPROMISED</h2>
-         <p className="text-cyan-200 text-lg mb-4">See how easy that was? The target's weak password 'Buster1985' was cracked instantly by your dictionary attack.</p>
-         
-         <div className="bg-black/40 p-5 rounded-lg border border-cyan-500/30 mb-8 max-w-2xl mx-auto text-left space-y-3">
-           <div className="flex items-center gap-2 border-b border-cyan-500/20 pb-2">
-             <div className="w-8 h-8 rounded-full bg-cyan-600 flex items-center justify-center font-bold text-white text-xs">CY</div>
-             <p className="text-md font-bold text-cyan-400">Cypher Debrief & Protocol:</p>
-           </div>
-           <p className="text-sm text-cyan-100 italic">"What you just executed is a targeted Dictionary Attack.</p>
-           <p className="text-sm text-cyan-100 italic">By running OSINT, you scraped the target's pet name and birth year to generate a custom wordlist. The brute-force script instantly found the match."</p>
-           <p className="text-sm text-yellow-400 font-bold mt-2">Lesson: Never use personal details in your master passwords.</p>
-           <p className="text-sm text-cyan-100 font-bold mt-2">You are now the System Admin. Secure this vault by constructing an unbreakable payload."</p>
-         </div>
+         <h2 className="text-4xl font-bold text-red-500 mb-4 tracking-widest uppercase">Breached: Admin Access</h2>
+         <p className="text-cyan-200 text-lg mb-8">See how easy that was? The target's weak password '{currentScenario?.correct_password || "Buster1985"}' was cracked by your custom dictionary attack.</p>
 
          <Button onClick={onComplete} size="lg" className="bg-cyan-600 hover:bg-cyan-500 text-white font-bold text-xl px-12 py-6">
-           Enter Admin Mode
-         </Button>
-         <Button
-           onClick={() => window.location.href = '/dashboard'}
-           size="lg"
-           variant="outline"
-           className="mt-3 border-slate-600 text-slate-300 hover:border-cyan-500 hover:text-cyan-300 w-full"
-         >
-           ← Back to Dashboard
+           Continue
          </Button>
       </div>
     );
   }
 
   return (
-    <Card className="w-full max-w-5xl bg-slate-950 border-cyan-500 shadow-2xl shadow-cyan-500/20 grid grid-cols-1 md:grid-cols-3 overflow-hidden">
+    <Card className="w-full max-w-5xl bg-slate-950 border-cyan-500 shadow-2xl shadow-cyan-500/20 grid grid-cols-1 md:grid-cols-3 overflow-hidden relative">
+      {introStep < 2 && (
+        <div className="absolute inset-0 z-50 bg-black/70 backdrop-blur-sm flex items-center justify-center p-4">
+          <div className="w-full max-w-lg bg-slate-900 border border-cyan-500/40 rounded-2xl p-6 shadow-2xl">
+            <div className="text-cyan-300 font-bold tracking-widest text-xs mb-3 uppercase">Quick briefing</div>
+            <ul className="list-disc pl-5 space-y-2 text-sm text-slate-200">
+              {introStep === 0 ? (
+                <>
+                  <li>This is a safe simulation of a dictionary attack.</li>
+                  <li>You will run three commands in order to unlock the vault.</li>
+                  <li>Use the buttons on the right if you prefer not to type.</li>
+                </>
+              ) : (
+                <>
+                  <li>Step 1: Run <span className="font-mono text-cyan-300">analyze target</span>.</li>
+                  <li>Step 2: Run <span className="font-mono text-cyan-300">generate_wordlist</span>.</li>
+                  <li>Step 3: Run <span className="font-mono text-cyan-300">crack_vault</span>.</li>
+                </>
+              )}
+            </ul>
+            <div className="mt-5 flex gap-3">
+              {introStep < 1 ? (
+                <Button onClick={() => setIntroStep(1)} className="flex-1 bg-cyan-600 hover:bg-cyan-500 text-white font-bold">
+                  Next
+                </Button>
+              ) : (
+                <Button onClick={() => setIntroStep(2)} className="flex-1 bg-cyan-600 hover:bg-cyan-500 text-white font-bold">
+                  Acknowledge &amp; Continue
+                </Button>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
       
       {/* LEFT: Retro Terminal (2 Columns) */}
       <div className="md:col-span-2 flex flex-col border-r border-slate-800">
@@ -223,7 +259,22 @@ export function TerminalVault({ onComplete }: TerminalVaultProps) {
                />
              </form>
            )}
-           {isHacking && <div className="animate-pulse">_</div>}
+           {isHacking && !isFinishing && <div className="animate-pulse">_ Generating permutations...</div>}
+           {isFinishing && (
+             <div className="mt-6 p-4 border border-red-500 bg-red-500/10 rounded animate-in zoom-in">
+               <div className="text-red-500 font-bold text-lg mb-2">CRACK COMPLETE</div>
+               <p className="text-xs text-slate-300 mb-4 font-sans">The password has been recovered and the vault perimeter is breached. Proceed to report findings?</p>
+               <Button 
+                onClick={() => {
+                  setUnlocked(true);
+                  onDialogue?.("vault-breached-full");
+                }}
+                className="bg-red-600 hover:bg-red-500 text-white font-bold w-full h-10 text-xs uppercase tracking-widest"
+               >
+                 Acknowledge Breach & Proceed
+               </Button>
+             </div>
+           )}
          </div>
       </div>
 

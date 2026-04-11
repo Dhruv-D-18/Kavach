@@ -34,7 +34,7 @@ function AuthContent() {
     if (mode === "login") {
       const result = await login(formData.email, formData.password);
       if (result.success) {
-        router.push("/dashboard");
+        router.push("/");
       } else {
         setError(result.error || "Invalid email or password.");
       }
@@ -42,8 +42,8 @@ function AuthContent() {
       const result = await signup(formData.username, formData.email, formData.password);
       if (result.success) {
         if (result.sessionCreated) {
-          // Email confirmation is OFF — session created instantly, go to dashboard
-          router.push("/dashboard");
+          // Email confirmation is OFF — session created instantly, go to home
+          router.push("/");
         } else {
           // Email confirmation is ON — tell user to check inbox
           setStep("email-sent");
@@ -63,7 +63,7 @@ function AuthContent() {
     if (!selectedAvatar) return;
     setIsLoading(true);
     await setAvatar(selectedAvatar);
-    router.push("/dashboard");
+    router.push("/");
   };
 
 

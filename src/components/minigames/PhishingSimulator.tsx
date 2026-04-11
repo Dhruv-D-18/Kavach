@@ -44,7 +44,7 @@ interface PhishingScenario {
 }
 
 interface PhishingSimulatorProps {
-  onComplete: (score: number) => void;
+  onComplete: (results: { score: number; correctCount: number; totalCount: number }) => void;
   scenarios: PhishingScenario[];
 }
 
@@ -57,17 +57,25 @@ export function PhishingSimulator({ onComplete, scenarios }: PhishingSimulatorPr
   const [isCorrect, setIsCorrect] = useState<boolean | null>(null);
   const [hoveredLink, setHoveredLink] = useState<{ display: string; actual: string } | null>(null);
   const [score, setScore] = useState(0);
+  const [correctCount, setCorrectCount] = useState(0);
   const [showSSL, setShowSSL] = useState(false);
 
   const currentScenario = scenarios[currentIndex];
 
-  const handleInspect = (type: "sniffer" | "ssl" | "sentiment", detail: string) => {
+  const handleInspect = (location: "url" | "sender" | "body") => {
     // Only log evidence if the Evidence Selector is active
     if (activeTool !== 'selector') return;
 
-    const flag = currentScenario.red_flags.find(f => f.tool === type && detail.includes(f.location));
-    if (flag && !findings.has(flag.description)) {
-      setFindings(prev => new Set(prev).add(flag.description));
+    // Find any flag at this location that matches the current active investigation goal
+    // or simply find any uncollected flag at this location
+    const flag = currentScenario.red_flags.find(f => f.location === location && !findings.has(f.description));
+    
+    if (flag) {
+      setFindings(prev => {
+        const next = new Set(prev);
+        next.add(flag.description);
+        return next;
+      });
     }
   };
 
@@ -79,6 +87,7 @@ export function PhishingSimulator({ onComplete, scenarios }: PhishingSimulatorPr
     
     if (correct) {
       setScore(prev => prev + 100);
+      setCorrectCount(prev => prev + 1);
     }
   };
 
@@ -87,7 +96,11 @@ export function PhishingSimulator({ onComplete, scenarios }: PhishingSimulatorPr
       setCurrentIndex(prev => prev + 1);
       resetState();
     } else {
-      onComplete(score);
+      onComplete({ 
+        score: score, 
+        correctCount: correctCount, 
+        totalCount: scenarios.length 
+      });
     }
   };
 
@@ -116,13 +129,13 @@ export function PhishingSimulator({ onComplete, scenarios }: PhishingSimulatorPr
           {/* Simulated App Header */}
           <div className="bg-slate-800 p-3 border-b border-slate-700 flex items-center justify-between">
             <div className="flex items-center gap-2">
-              {currentScenario.type === "email" ? <Mail className="w-4 h-4 text-purple-400" /> : <Globe className="w-4 h-4 text-cyan-400" />}
+              {currentScenario?.type === "email" ? <Mail className="w-4 h-4 text-purple-400" /> : <Globe className="w-4 h-4 text-cyan-400" />}
               <span className="text-xs font-bold text-slate-400 uppercase tracking-widest">
-                Intercept Source: {currentScenario.brand} - CASE #{currentIndex + 1}
+                Intercept Source: {currentScenario?.brand || "System Intercept"} - CASE #{currentIndex + 1}
               </span>
             </div>
             <Badge variant="outline" className="text-[10px] border-slate-600">
-              {currentScenario.difficulty} DEPTH
+              {currentScenario?.difficulty || "Standard"} DEPTH
             </Badge>
           </div>
 
@@ -133,7 +146,7 @@ export function PhishingSimulator({ onComplete, scenarios }: PhishingSimulatorPr
                 className={`w-3 h-3 cursor-pointer transition-colors ${activeTool === 'ssl' ? 'text-green-400' : 'text-slate-600 hover:text-slate-400'} ${activeTool === 'selector' ? 'text-yellow-400 ring-2 ring-yellow-500 rounded-full' : ''}`} 
                 onClick={() => {
                   if (activeTool === 'selector') {
-                    handleInspect("ssl", "url");
+                    handleInspect("url");
                   } else {
                     setActiveTool("ssl");
                     setShowSSL(true);
@@ -146,7 +159,7 @@ export function PhishingSimulator({ onComplete, scenarios }: PhishingSimulatorPr
                 onMouseLeave={() => setHoveredLink(null)}
                 onClick={() => {
                   if (activeTool === 'selector') {
-                    handleInspect("sniffer", "url");
+                    handleInspect("url");
                   } else {
                     setActiveTool("sniffer");
                   }
@@ -159,7 +172,7 @@ export function PhishingSimulator({ onComplete, scenarios }: PhishingSimulatorPr
 
           {/* Content Area */}
           <div className="p-8 bg-slate-900 min-h-[400px] relative group">
-            {currentScenario.type === "email" && (
+            {currentScenario?.type === "email" && (
               <div className="mb-6 border-b border-slate-800 pb-4">
                 <div className="text-sm text-slate-400 mb-1">
                   <span className="font-bold text-slate-500 w-16 inline-block">From:</span> 
@@ -167,15 +180,15 @@ export function PhishingSimulator({ onComplete, scenarios }: PhishingSimulatorPr
                     className={`cursor-crosshair px-1 rounded transition-colors ${activeTool === 'sniffer' ? 'bg-cyan-500/10 text-cyan-400 hover:bg-cyan-500/20' : ''} ${activeTool === 'selector' ? 'ring-2 ring-cyan-500' : ''}`}
                     onClick={() => {
                       if (activeTool === 'selector') {
-                        handleInspect("sniffer", "sender");
+                        handleInspect("sender");
                       }
                     }}
                   >
-                    {currentScenario.sender}
+                    {currentScenario?.sender || "unknown-origin@network.kavach"}
                   </span>
                 </div>
                 <div className="text-sm text-slate-400">
-                  <span className="font-bold text-slate-500 w-16 inline-block">Subject:</span> {currentScenario.subject}
+                  <span className="font-bold text-slate-500 w-16 inline-block">Subject:</span> {currentScenario?.subject || "Encrypted Communication"}
                 </div>
               </div>
             )}
@@ -184,16 +197,16 @@ export function PhishingSimulator({ onComplete, scenarios }: PhishingSimulatorPr
               className={`max-w-none transition-all ${activeTool === 'sentiment' ? 'cursor-help' : ''} ${activeTool === 'selector' ? 'cursor-crosshair ring-1 ring-slate-800' : ''}`}
               onClick={() => {
                 if (activeTool === 'selector') {
-                  handleInspect("sentiment", "body");
+                  handleInspect("body");
                 }
               }}
               dangerouslySetInnerHTML={{ 
                 __html: activeTool === 'sentiment' 
-                  ? currentScenario.content.replace(
+                  ? (currentScenario?.content || "").replace(
                       /\b(immediately|suspended|urgent|24 hours|warning|verify|action|disabled)\b/gi, 
                       match => `<span class="bg-purple-500/40 text-purple-200 border-b border-purple-400 animate-pulse px-1 rounded">${match}</span>`
                     )
-                  : currentScenario.content 
+                  : (currentScenario?.content || "")
               }}
             />
 
@@ -205,7 +218,8 @@ export function PhishingSimulator({ onComplete, scenarios }: PhishingSimulatorPr
                 onMouseLeave={() => setHoveredLink(null)}
                 onClick={() => {
                   if (activeTool === 'selector') {
-                    handleInspect("sniffer", "url");
+                    handleInspect("body");
+                    handleInspect("url"); // Some buttons might be clues for either
                   }
                 }}
                 title={activeTool === 'selector' ? 'Log as Forensic Evidence' : 'Caution: Interaction Point'}
