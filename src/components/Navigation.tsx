@@ -82,7 +82,7 @@ export const Navigation = () => {
                   className="text-sm"
                   onClick={async () => {
                     await logout();
-                    window.location.href = '/';
+                    router.push('/');
                   }}
                 >
                   Logout

@@ -77,7 +77,7 @@ export function GameMap({ children, onPositionChange, gridSize = 50 }: GameMapPr
 
   // Render grid tiles
   const renderGrid = () => {
-    const tiles = [];
+    const tiles: React.ReactNode[] = [];
     for (let y = 0; y < mapHeight; y++) {
       for (let x = 0; x < mapWidth; x++) {
         const isWalkable = true; // Can add walls/obstacles later

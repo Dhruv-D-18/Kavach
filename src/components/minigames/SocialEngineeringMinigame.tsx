@@ -1,8 +1,8 @@
 "use client";
 
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from "@/components/ui/card";
+import { Card, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { User, CheckCircle2, AlertTriangle, Search, ChevronRight } from "lucide-react";
 
@@ -68,8 +68,7 @@ export function SocialEngineeringMinigame({ onComplete, onDialogue }: SocialEngi
         ].sort(() => Math.random() - 0.5);
         setPasswords(generated);
 
-      } catch (err) {
-        console.error("Failed to fetch profiles:", err);
+      } catch {
         setProfile(FALLBACK_PROFILE as any);
         setPasswords([
             { text: "Buster1985!", isVulnerable: true, target: "buster" },

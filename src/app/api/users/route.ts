@@ -1,22 +1,55 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { createClient } from '@supabase/supabase-js';
+import crypto from 'crypto';
 
-// This is a mock API for demonstration purposes
-// In a real application, this would connect to a database
+const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
 
-interface User {
+function getAdminClient() {
+  if (!supabaseUrl || !supabaseServiceKey) {
+    throw new Error('Missing SUPABASE_SERVICE_ROLE_KEY environment variable');
+  }
+  return createClient(supabaseUrl, supabaseServiceKey, {
+    auth: { persistSession: false },
+  });
+}
+
+function hashPassword(password: string): string {
+  const salt = crypto.randomBytes(16).toString('hex');
+  const hash = crypto.pbkdf2Sync(password, salt, 100000, 64, 'sha512').toString('hex');
+  return `${salt}:${hash}`;
+}
+
+function verifyPassword(password: string, stored: string): boolean {
+  const [salt, hash] = stored.split(':');
+  const computed = crypto.pbkdf2Sync(password, salt, 100000, 64, 'sha512').toString('hex');
+  return hash === computed;
+}
+
+async function verifyAuth(request: NextRequest) {
+  const authHeader = request.headers.get('authorization');
+  if (!authHeader?.startsWith('Bearer ')) {
+    return null;
+  }
+  const token = authHeader.slice(7);
+  const supabase = getAdminClient();
+  const { data: { user }, error } = await supabase.auth.getUser(token);
+  if (error || !user) return null;
+  return user;
+}
+
+interface StoredUser {
   id: string;
   username: string;
   email: string;
-  password: string; // In a real app, this would be hashed
+  passwordHash: string;
   score: number;
   level: number;
   xp: number;
   createdAt: string;
 }
 
-// Mock database
-const users: User[] = [];
-
+const users: StoredUser[] = [];
 
 export async function POST(request: NextRequest) {
   try {
@@ -24,19 +57,18 @@ export async function POST(request: NextRequest) {
     const { action, ...data } = body;
 
     switch (action) {
-      case 'signup':
-        // Check if user already exists
+      case 'signup': {
         const existingUser = users.find(u => u.email === data.email);
         if (existingUser) {
           return NextResponse.json({ error: 'User already exists' }, { status: 400 });
         }
 
-        // Create new user
-        const newUser: User = {
-          id: Math.random().toString(36).substring(2, 15),
+        const passwordHash = hashPassword(data.password);
+        const newUser: StoredUser = {
+          id: crypto.randomUUID(),
           username: data.username,
           email: data.email,
-          password: data.password, // In a real app, hash this!
+          passwordHash,
           score: 0,
           level: 1,
           xp: 0,
@@ -44,7 +76,7 @@ export async function POST(request: NextRequest) {
         };
 
         users.push(newUser);
-        return NextResponse.json({ 
+        return NextResponse.json({
           user: {
             id: newUser.id,
             username: newUser.username,
@@ -54,14 +86,15 @@ export async function POST(request: NextRequest) {
             xp: newUser.xp
           }
         });
+      }
 
-      case 'login':
-        const user = users.find(u => u.email === data.email && u.password === data.password);
-        if (!user) {
+      case 'login': {
+        const user = users.find(u => u.email === data.email);
+        if (!user || !verifyPassword(data.password, user.passwordHash)) {
           return NextResponse.json({ error: 'Invalid credentials' }, { status: 401 });
         }
 
-        return NextResponse.json({ 
+        return NextResponse.json({
           user: {
             id: user.id,
             username: user.username,
@@ -71,8 +104,14 @@ export async function POST(request: NextRequest) {
             xp: user.xp
           }
         });
+      }
 
-      case 'updateScore':
+      case 'updateScore': {
+        const authUser = await verifyAuth(request);
+        if (!authUser) {
+          return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+        }
+
         const userToUpdate = users.find(u => u.id === data.userId);
         if (!userToUpdate) {
           return NextResponse.json({ error: 'User not found' }, { status: 404 });
@@ -82,7 +121,7 @@ export async function POST(request: NextRequest) {
         userToUpdate.xp = data.xp;
         userToUpdate.level = data.level;
 
-        return NextResponse.json({ 
+        return NextResponse.json({
           user: {
             id: userToUpdate.id,
             username: userToUpdate.username,
@@ -92,24 +131,12 @@ export async function POST(request: NextRequest) {
             xp: userToUpdate.xp
           }
         });
+      }
 
       default:
         return NextResponse.json({ error: 'Invalid action' }, { status: 400 });
     }
-  } catch (error) {
-    console.error('API Error:', error);
+  } catch {
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
   }
-}
-
-export async function GET(request: NextRequest) {
-  // Return all users (for demonstration only)
-  return NextResponse.json({ users: users.map(u => ({
-    id: u.id,
-    username: u.username,
-    email: u.email,
-    score: u.score,
-    level: u.level,
-    xp: u.xp
-  })) });
 }

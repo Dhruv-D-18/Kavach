@@ -45,9 +45,8 @@ export function useMovement(onMove: (newPos: { x: number, y: number }) => void) 
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [position]);
   
-  const isCollision = (x: number, y: number) => {
-    // Implement collision logic
-    return false; // Placeholder
+  const isCollision = (_x: number, _y: number) => {
+    return false;
   };
   
   return position;

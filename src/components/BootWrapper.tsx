@@ -15,30 +15,21 @@ export function BootWrapper({ children }: { children: React.ReactNode }) {
   const [mounted, setMounted] = useState(false);
 
   useEffect(() => {
-    console.log('BootWrapper mounted');
     setMounted(true);
     
-    // Check global window flag
     if (typeof window === 'undefined') return;
     
     const hasShown = window.__KAVACH_BOOT_SHOWN;
     
     if (!hasShown) {
-      console.log('✅ FIRST LOAD EVER - Setting flag and showing boot');
-      // Set flag IMMEDIATELY before any async operations
       window.__KAVACH_BOOT_SHOWN = true;
-      console.log('Flag set:', window.__KAVACH_BOOT_SHOWN);
-      
-      // Show boot animation
       setShowBoot(true);
     } else {
-      console.log('⏭️ Boot already shown - skipping (flag is', window.__KAVACH_BOOT_SHOWN, ')');
       setShowBoot(false);
     }
   }, []);
 
   const handleBootComplete = () => {
-    console.log('Boot animation completed');
     setShowBoot(false);
   };
 

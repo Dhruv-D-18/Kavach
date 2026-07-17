@@ -1,13 +1,11 @@
 "use client";
 
-import { useState } from "react";
 import { Navigation } from "@/components/Navigation";
 import { Button } from "@/components/ui/button";
-import { Shield, Target, Users, Award, ArrowRight, Lock, Globe } from "lucide-react";
+import { Shield, Target, Users, Award, ArrowRight, Globe } from "lucide-react";
 import Link from "next/link";
 import { BootAnimation } from "@/components/BootAnimation";
 import { useUser } from "@/context/user-context";
-import { HoverGuide } from "@/components/HoverGuide";
 import { HoverZone } from "@/components/HoverZone";
 import { FirstTimeTour } from "@/components/FirstTimeTour";
 import { useRouter } from "next/navigation";
@@ -67,7 +65,7 @@ export default function Home() {
             and compete with cyber defenders worldwide.
           </p>
 
-          <HoverZone tourId="explore" delayMs={300} className="flex flex-col sm:flex-row gap-4 justify-center">
+          <HoverZone className="flex flex-col sm:flex-row gap-4 justify-center">
             <Button
               id="tour-explore"
               size="lg"
@@ -89,7 +87,7 @@ export default function Home() {
       </section>
 
       {/* Features Grid */}
-      <HoverZone tourId="features">
+      <HoverZone>
         <section id="tour-features" className="py-20 px-4">
           <div className="container mx-auto">
             <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-6">

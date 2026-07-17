@@ -1,39 +1,32 @@
 "use client";
 
-import { useState, useEffect, useRef, useCallback } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { Navigation } from "@/components/Navigation";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Progress } from "@/components/ui/progress";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useUser } from "@/context/user-context";
 import { CypherGuide } from "@/components/CypherGuide";
 import { ModuleBriefing } from "@/components/ModuleBriefing";
-import { GameModeModule } from "@/components/GameModeModule";
 import { SideScrollerLevel } from "@/components/SideScrollerLevel";
 import {
   Lock,
-  Shield,
-  Trophy,
   AlertTriangle,
   CheckCircle2,
-  XCircle,
-  ArrowLeft,
   BookOpen,
   Star
 } from "lucide-react";
 import { useRouter } from "next/navigation";
 import zxcvbn from "zxcvbn";
-import { getCypherDialogue, getFirstTimeGuidance, getSuccessGuidance } from "@/lib/cypher-dialogues";
+import { getCypherDialogue, getSuccessGuidance } from "@/lib/cypher-dialogues";
 
 export default function CrackTheVault() {
   const router = useRouter();
-  const { user, profile, updateScore, completeTour, isLoading } = useUser();
+  const { user, profile, updateScore, isLoading } = useUser();
   const [showTour, setShowTour] = useState(false);
   const [theoryCompleted, setTheoryCompleted] = useState(false);
-  const theoryAudioRef = useRef<HTMLAudioElement | null>(null);
 
   const [password, setPassword] = useState("");
   const [strength, setStrength] = useState(0);
@@ -42,14 +35,13 @@ export default function CrackTheVault() {
   const [feedback, setFeedback] = useState<string[]>([]);
   const [dictionaryWords, setDictionaryWords] = useState<string[]>([]);
   const [score, setScore] = useState(0);
-  const [xp, setXp] = useState(0);
   const [level, setLevel] = useState(1);
   const [unlocked, setUnlocked] = useState(false);
   const [attempts, setAttempts] = useState(0);
 
   // Cypher guidance system
   const [cypherMessage, setCypherMessage] = useState<{ text: string; type: "info" | "warning" | "success" | "tip"; audioFile?: string; isBlocking?: boolean } | null>(null);
-  const [showCypher, setShowCypher] = useState(true);
+  const [showCypher] = useState(true);
   const [gameState, setGameState] = useState<"briefing" | "scrolling" | "vault" | "complete">("briefing");
   const [isBlocked, setIsBlocked] = useState(false);
   
@@ -98,12 +90,6 @@ export default function CrackTheVault() {
       return () => clearTimeout(timer);
     }
   }, [profile, showTour]);
-
-  const handleTourComplete = async () => {
-    setShowTour(false);
-    await completeTour();
-    // Briefing will trigger via the useEffect above
-  };
 
   const handleTheoryComplete = () => {
     if (theoryCompleted) return;
@@ -291,7 +277,7 @@ export default function CrackTheVault() {
     }
   }, [currentDialogueIndex, dialogueQueue]);
 
-  const handleCheckpoint = (id: string) => {
+  const handleCheckpoint = (_id: string) => {
     // Checkpoint logic meta-tracking could go here
   };
 
@@ -352,7 +338,7 @@ export default function CrackTheVault() {
     return {
       score: scorePercentage,
       label,
-      time,
+      time: String(time),
       feedback,
       dictionaryWords
     };
@@ -410,10 +396,8 @@ export default function CrackTheVault() {
 
       // Bonus for perfect score
       if (strength === 100) {
-        setXp(earnedXp + 50); // Bonus 50 XP for perfect password
         setScore(score + earnedXp + 50);
       } else {
-        setXp(earnedXp);
         setScore(score + earnedXp);
       }
 
@@ -451,13 +435,6 @@ export default function CrackTheVault() {
     }
   };
 
-  // Reset the game
-  const resetGame = () => {
-    setPassword("");
-    setUnlocked(false);
-    setAttempts(0);
-  };
-
   // Get strength color
   const getStrengthColor = () => {
     if (strength >= 80) return "text-green-500";
@@ -483,15 +460,6 @@ export default function CrackTheVault() {
     if (strength >= 40) return "text-yellow-500";
     if (strength >= 20) return "text-orange-500";
     return "text-red-500";
-  };
-
-  // Get strength description
-  const getStrengthDescription = () => {
-    if (strength >= 80) return "Excellent! This password would take centuries to crack.";
-    if (strength >= 60) return "Strong password. Would take years to crack with brute force.";
-    if (strength >= 40) return "Medium strength. Could be cracked in days with modern tools.";
-    if (strength >= 20) return "Weak password. Might be cracked in hours.";
-    return "Very weak. Could be cracked instantly.";
   };
 
   if (isLoading) {

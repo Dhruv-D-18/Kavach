@@ -27,7 +27,7 @@ export function GameModeModule({ onExit }: GameModeModuleProps) {
       audioRef.current.pause();
     }
     audioRef.current = new Audio(src);
-    audioRef.current.play().catch(err => console.error("Audio playback failed:", err));
+    audioRef.current.play().catch(() => {});
   };
 
   // Play welcome on mount

@@ -126,7 +126,7 @@ export function getFirstTimeGuidance() {
   };
 }
 
-export function getSuccessGuidance(xp: number, attempts: number) {
+export function getSuccessGuidance(_xp: number, _attempts: number) {
   return {
     text: "Massive entropy achieved. A network of supercomputers would need centuries to crack this. The vault is secure.",
     type: "success",

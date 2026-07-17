@@ -2,8 +2,8 @@
 
 import { useState, useEffect, useRef } from "react";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent } from "@/components/ui/card";
-import { Terminal, Shield, CheckCircle2, ChevronRight, Search, FileText, Zap } from "lucide-react";
+import { Card } from "@/components/ui/card";
+import { Terminal, Shield, CheckCircle2, Search, FileText, Zap } from "lucide-react";
 
 interface TerminalVaultProps {
   onComplete: () => void;
@@ -22,7 +22,6 @@ export function TerminalVault({ onComplete, onDialogue }: TerminalVaultProps) {
   
   // Progress state: 0=start, 1=osint done, 2=wordlist done, 3=cracked
   const [step, setStep] = useState(0); 
-  const [scenarios, setScenarios] = useState<any[]>([]);
   const [currentScenario, setCurrentScenario] = useState<any>(null);
   const [isFinishing, setIsFinishing] = useState(false);
 
@@ -36,7 +35,6 @@ export function TerminalVault({ onComplete, onDialogue }: TerminalVaultProps) {
       try {
         const { data } = await import("@/lib/supabase").then(m => m.supabase.from("password_scenarios").select("*"));
         if (data && data.length > 0) {
-          setScenarios(data);
           setCurrentScenario(data[Math.floor(Math.random() * data.length)]);
         } else {
           // Fallback
@@ -48,8 +46,8 @@ export function TerminalVault({ onComplete, onDialogue }: TerminalVaultProps) {
             correct_password: "Buster1985"
           });
         }
-      } catch (err) {
-        console.error("Failed to fetch scenarios:", err);
+      } catch {
+        // Silently handle fetch failure, use fallback
       }
     };
     fetchScenarios();
@@ -61,9 +59,13 @@ export function TerminalVault({ onComplete, onDialogue }: TerminalVaultProps) {
     }
   }, [history]);
 
+  const escapeHtml = (str: string) => {
+    return str.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+  };
+
   const handleCommand = (rawCmd: string) => {
     const cmd = rawCmd.toLowerCase().trim();
-    setHistory(prev => [...prev, `C:\\Hacker\\Tools> ${rawCmd}`]);
+    setHistory(prev => [...prev, `C:\\Hacker\\Tools> ${escapeHtml(rawCmd)}`]);
 
     if (cmd === "analyze target") {
       if (step >= 1) {
@@ -108,7 +110,7 @@ export function TerminalVault({ onComplete, onDialogue }: TerminalVaultProps) {
         startHackingSequence();
       }
     } else {
-      setHistory(prev => [...prev, `'${rawCmd}' is not recognized. Use the Hacker Toolkit commands.`]);
+      setHistory(prev => [...prev, `'${escapeHtml(rawCmd)}' is not recognized. Use the Hacker Toolkit commands.`]);
     }
     
     setInput("");

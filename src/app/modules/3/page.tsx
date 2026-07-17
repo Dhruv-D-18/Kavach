@@ -9,8 +9,7 @@ import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
 import { CypherGuide } from "@/components/CypherGuide";
 import { useUser } from "@/context/user-context";
-import { supabase } from "@/lib/supabase";
-import { ArrowLeft, Shield, Activity, Zap, Timer, ServerCrash, CheckCircle2, BookOpen, Target, Trophy } from "lucide-react";
+import { ArrowLeft, Shield, Activity, Zap, ServerCrash, CheckCircle2, BookOpen, Target, Trophy } from "lucide-react";
 
 type Phase = "briefing" | "playing" | "won" | "failed";
 type ThreatType = "unauthorized-port" | "buffer-overflow" | "ddos-surge";
@@ -37,9 +36,6 @@ type FirewallRule = {
 
 const PLAYFIELD_W = 980;
 const PLAYFIELD_H = 420;
-const GUARDIAN_X = 200;
-const GUARDIAN_W = 44;
-const GUARDIAN_H = 44;
 const SERVER_X = 900;
 const TICK_MS = 80;
 const MISSION_SECONDS = 95;
@@ -142,7 +138,6 @@ export default function OperationIronWall() {
     type: "info" | "warning" | "success" | "tip";
     audioFile?: string;
   } | null>(null);
-  const [showTutorial, setShowTutorial] = useState(false);
 
   const idRef = useRef(1);
   const botnetRef = useRef<string | null>("112.5.19.77");
@@ -166,10 +161,6 @@ export default function OperationIronWall() {
       audioFile: "/audio/m3_briefing.mp3"
     });
   }, [phase]);
-
-  const removeRule = (id: string) => {
-    setRules(prev => prev.filter(r => r.id !== id));
-  };
 
   const quickFill = (type: "port" | "ip" | "size", value: string | number) => {
     setSelectedRuleType(type);

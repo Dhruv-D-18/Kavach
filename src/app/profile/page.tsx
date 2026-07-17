@@ -6,26 +6,19 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Badge } from "@/components/ui/badge";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Progress } from "@/components/ui/progress";
 import { 
-  User, 
   Mail, 
   Shield, 
   Trophy, 
-  Calendar,
   Target,
-  Activity,
-  Settings
 } from "lucide-react";
 import { useUser } from "@/context/user-context";
 import { supabase } from "@/lib/supabase";
 
 export default function Profile() {
   const { user, profile, isLoading } = useUser();
-  const [history, setHistory] = useState<any[]>([]);
   const [stats, setStats] = useState({ modules: 0 });
   const [updateLoading, setUpdateLoading] = useState(false);
   const [formData, setFormData] = useState({
@@ -72,30 +65,26 @@ export default function Profile() {
       setMessage({ text: "Account credentials updated successfully.", type: "success" });
       setFormData(prev => ({ ...prev, newPassword: "" })); // Clear password field
     } catch (err: any) {
-      console.error("Update error:", err);
-      setMessage({ text: err.message || "Failed to update account.", type: "error" });
+      setMessage({ text: err?.message || "Failed to update account.", type: "error" });
     } finally {
       setUpdateLoading(false);
     }
   };
 
   useEffect(() => {
-    async function fetchHistory() {
+    async function fetchStats() {
       if (!user) return;
       const { data, error } = await (supabase as any)
         .from('student_submissions')
-        .select('*')
-        .eq('user_id', user.id)
-        .order('completed_at', { ascending: false });
+        .select('module_id')
+        .eq('user_id', user.id);
 
       if (!error && data) {
-        setHistory(data);
-        // Count unique modules
         const uniqueModules = new Set(data.map((s: any) => s.module_id)).size;
         setStats({ modules: uniqueModules });
       }
     }
-    fetchHistory();
+    fetchStats();
   }, [user]);
   if (isLoading) {
     return (
@@ -124,23 +113,6 @@ export default function Profile() {
     );
   }
   
-  const badges = [
-    { id: 1, name: "First Steps", icon: "🎯", description: "Complete your first module", unlocked: true },
-    { id: 2, name: "Week Warrior", icon: "🔥", description: "Maintain a 7-day streak", unlocked: true },
-    { id: 3, name: "Quiz Master", icon: "🧠", description: "Score 100% on 5 quizzes", unlocked: true },
-    { id: 4, name: "Game Champion", icon: "🎮", description: "Complete all game modules", unlocked: false },
-    { id: 5, name: "Security Expert", icon: "🛡️", description: "Reach level 10", unlocked: false },
-    { id: 6, name: "Speed Demon", icon: "⚡", description: "Complete a module in under 30 min", unlocked: false },
-  ];
-
-  const recentAchievements = [
-    { date: "2 days ago", title: "Week Warrior Badge Unlocked", xp: 100 },
-    { date: "5 days ago", title: "Reached Level 7", xp: 200 },
-    { date: "1 week ago", title: "Completed Password Security Module", xp: 150 },
-  ];
-
-  const progressPercent = ((profile?.xp ?? 0) / ((profile?.level ?? 1) * 500)) * 100;
-
   return (
     <div className="min-h-screen bg-gradient-dark">
       <Navigation />
@@ -204,7 +176,7 @@ export default function Profile() {
                 </div>
                 <div>
                   <p className="text-sm text-muted-foreground font-medium">Total XP</p>
-                  <p className="text-2xl font-bold text-slate-100">{profile?.xp.toLocaleString()}</p>
+                  <p className="text-2xl font-bold text-slate-100">{(profile?.xp ?? 0).toLocaleString()}</p>
                 </div>
               </div>
             </CardContent>
@@ -232,7 +204,7 @@ export default function Profile() {
                 </div>
                 <div>
                   <p className="text-sm text-muted-foreground font-medium">Clearance Level</p>
-                  <p className="text-2xl font-bold text-cyan-400">Level {profile?.level}</p>
+                  <p className="text-2xl font-bold text-cyan-400">Level {profile?.level ?? 1}</p>
                 </div>
               </div>
             </CardContent>

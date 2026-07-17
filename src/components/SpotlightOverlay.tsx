@@ -26,6 +26,9 @@ export function SpotlightOverlay({ targetId, isOpen, padding = 10 }: SpotlightOv
         width: rect.width + padding * 2,
         height: rect.height + padding * 2,
       });
+    } else {
+      console.warn(`SpotlightOverlay: Element with id "${targetId}" not found`);
+      setCoords(null);
     }
   }, [targetId, isOpen, padding]);
 

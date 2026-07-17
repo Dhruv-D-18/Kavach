@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Navigation } from "@/components/Navigation";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -8,11 +8,13 @@ import { Progress } from "@/components/ui/progress";
 import { Trophy, Target, Lock, UserCircle } from "lucide-react";
 import { NavLink } from "@/components/NavLink";
 import { useUser } from "@/context/user-context";
+import { supabase } from "@/lib/supabase";
 
 export default function Dashboard() {
   const { user, profile, setAvatar, completeTour, isLoading } = useUser();
   const [selectedAvatar, setSelectedAvatar] = useState<"male" | "female" | null>(null);
   const [avatarLoading, setAvatarLoading] = useState(false);
+  const [stats, setStats] = useState({ modules: 0 });
 
   const handleAvatarConfirm = async () => {
     if (!selectedAvatar) return;
@@ -25,6 +27,22 @@ export default function Dashboard() {
       setAvatarLoading(false);
     }
   };
+
+  // Fetch module completion stats
+  useEffect(() => {
+    async function fetchStats() {
+      if (!user) return;
+      const { data } = await supabase
+        .from('student_submissions')
+        .select('module_id')
+        .eq('user_id', user.id);
+      if (data) {
+        const uniqueModules = new Set(data.map((s: any) => s.module_id)).size;
+        setStats({ modules: uniqueModules });
+      }
+    }
+    fetchStats();
+  }, [user]);
 
   // Handle Loading Session
   if (isLoading) {
@@ -55,7 +73,6 @@ export default function Dashboard() {
   }
   
   // Calculate xpToNext based on level (500 XP per level)
-  const currentLevel = profile?.level ?? 1;
   const xpInCurrentLevel = (profile?.xp ?? 0) % 500;
   const progressPercent = (xpInCurrentLevel / 500) * 100;
 
@@ -150,12 +167,12 @@ export default function Dashboard() {
           <Card className="glass-card border-primary/20">
             <CardHeader className="flex flex-row items-center justify-between pb-2">
               <CardTitle className="text-sm font-medium text-muted-foreground">
-                Global Rank
+                Total Score
               </CardTitle>
               <Target className="h-4 w-4 text-primary" />
             </CardHeader>
             <CardContent>
-              <div className="text-3xl font-bold text-primary">#{profile?.score ?? 0}</div>
+              <div className="text-3xl font-bold text-primary">{profile?.score ?? 0}</div>
               <p className="text-xs text-muted-foreground mt-1">
                 Total Score
               </p>
@@ -171,10 +188,10 @@ export default function Dashboard() {
             </CardHeader>
             <CardContent>
               <div className="text-3xl font-bold text-primary">
-                1/1
+                {stats?.modules ?? 0}/3
               </div>
               <p className="text-xs text-muted-foreground mt-1">
-                100% complete
+                {stats?.modules ? Math.round((stats.modules / 3) * 100) : 0}% complete
               </p>
             </CardContent>
           </Card>
@@ -182,13 +199,13 @@ export default function Dashboard() {
           <Card className="glass-card border-primary/20">
             <CardHeader className="flex flex-row items-center justify-between pb-2">
               <CardTitle className="text-sm font-medium text-muted-foreground">
-                Current Streak
+                Current Level
               </CardTitle>
               <Trophy className="h-4 w-4 text-primary" />
             </CardHeader>
             <CardContent>
-              <div className="text-3xl font-bold text-primary">{profile?.level ?? 1}</div>
-              <p className="text-xs text-muted-foreground mt-1">days in a row 🔥</p>
+              <div className="text-3xl font-bold text-primary">Level {profile?.level ?? 1}</div>
+              <p className="text-xs text-muted-foreground mt-1">Keep training to level up</p>
             </CardContent>
           </Card>
         </div>

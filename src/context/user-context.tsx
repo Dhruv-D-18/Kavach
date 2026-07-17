@@ -30,7 +30,7 @@ export function UserProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<SupabaseUser | null>(null);
   const [profile, setProfile] = useState<Profile | null>(null);
   const [isLoading, setIsLoading] = useState(true);
-  const [isNewUser, setIsNewUser] = useState(false);
+  const [isNewUser] = useState(false);
   const [activeHoverTour, setActiveHoverTour] = useState<string | null>(null);
   const [hasBooted, setHasBooted] = useState(false);
   const [seenDialogues, setSeenDialogues] = useState<Set<string>>(new Set());
@@ -47,14 +47,10 @@ export function UserProvider({ children }: { children: ReactNode }) {
       if (!error && data) {
         setProfile(data as Profile);
       } else {
-        console.warn("[User Context] Profile not found or failed to load. Attempting to create fallback profile...", error);
-        
-        // Get user metadata to extract the username entered during sign up
         const { data: { user: authUser } } = await supabase.auth.getUser();
         if (authUser) {
           const username = authUser.user_metadata?.username || authUser.email?.split('@')[0] || 'Agent';
           
-          console.log("[User Context] Creating profile row for:", authUser.id, "with username:", username);
           const { data: newProfile, error: createError } = await (supabase as any)
             .from("profiles")
             .insert({
@@ -71,22 +67,23 @@ export function UserProvider({ children }: { children: ReactNode }) {
 
           if (!createError && newProfile) {
             setProfile(newProfile as Profile);
-            console.log("[User Context] Fallback profile created successfully.");
-          } else {
-            console.error("[User Context] Fallback profile creation failed:", createError);
           }
         }
       }
-    } catch (err) {
-      console.error("[User Context] Error during fetchProfile fallback flow:", err);
+    } catch {
+      // Silently handle profile fetch errors
     }
   };
 
   // Load seen dialogues from localStorage (per user)
   const loadSeenDialogues = (userId: string) => {
-    const stored = localStorage.getItem(`seenDialogues_${userId}`);
-    if (stored) {
-      setSeenDialogues(new Set(JSON.parse(stored)));
+    try {
+      const stored = localStorage.getItem(`seenDialogues_${userId}`);
+      if (stored) {
+        setSeenDialogues(new Set(JSON.parse(stored)));
+      }
+    } catch {
+      // Silently handle localStorage access errors
     }
   };
 
@@ -105,8 +102,8 @@ export function UserProvider({ children }: { children: ReactNode }) {
           await fetchProfile(session.user.id);
           loadSeenDialogues(session.user.id);
         }
-      } catch (err) {
-        console.warn("Supabase auth session lock error (ignored):", err);
+      } catch {
+        // Ignore auth session lock errors
       } finally {
         clearTimeout(loadingTimeout);
         setIsLoading(false);
@@ -127,8 +124,8 @@ export function UserProvider({ children }: { children: ReactNode }) {
           setProfile(null);
           setSeenDialogues(new Set());
         }
-      } catch (err) {
-        console.warn("Supabase auth state change lock error (ignored):", err);
+      } catch {
+        // Ignore auth state change errors
         setIsLoading(false);
       }
     });
@@ -187,13 +184,13 @@ export function UserProvider({ children }: { children: ReactNode }) {
         }
       }
       keysToRemove.forEach(key => localStorage.removeItem(key));
-    } catch (e) {
-      console.warn("Failed to manually clear auth localStorage keys:", e);
+    } catch {
+      // Silently handle localStorage clear failure
     }
 
     try {
       sessionStorage.clear();
-    } catch (e) {}
+    } catch {}
 
     // 3. Clear cookies
     try {
@@ -205,7 +202,7 @@ export function UserProvider({ children }: { children: ReactNode }) {
         document.cookie = name + "=;expires=Thu, 01 Jan 1970 00:00:00 GMT;path=/";
         document.cookie = name + `=;expires=Thu, 01 Jan 1970 00:00:00 GMT;path=/;domain=${window.location.hostname}`;
       }
-    } catch (e) {}
+    } catch {}
 
     // 4. Trigger signOut in background with a timeout fallback (non-blocking)
     try {
@@ -213,14 +210,13 @@ export function UserProvider({ children }: { children: ReactNode }) {
         setTimeout(() => reject(new Error("Signout timed out")), 800)
       );
       await Promise.race([supabase.auth.signOut(), timeoutPromise]);
-    } catch (err) {
-      console.warn('Supabase signOut error/timeout (ignored):', err);
+    } catch {
+      // Ignore signOut timeout errors
     }
   };
 
   const updateScore = async (points: number, metadata?: { moduleId: number; moduleName: string; accuracy?: number }) => {
     if (!user || !profile) {
-      console.warn("[XP Update] Cannot update score: user or profile is null", { user, profile });
       return;
     }
 
@@ -240,8 +236,6 @@ export function UserProvider({ children }: { children: ReactNode }) {
     // Dynamic level calculation: 500 XP per level
     const newLevel = Math.floor(newXp / 500) + 1;
 
-    console.log(`[XP Update] Points: ${points}, New XP: ${newXp}, New Level: ${newLevel}`);
-
     // 1. Update Profile (Live XP/Level)
     const { data, error } = await (supabase as any)
       .from("profiles")
@@ -255,16 +249,13 @@ export function UserProvider({ children }: { children: ReactNode }) {
       .select()
       .single();
 
-    if (error) {
-      console.error("[XP Update] Error updating user profile:", error);
-    } else if (data) {
-      console.log("[XP Update] Profile updated successfully in Supabase:", data);
+    if (!error && data) {
       setProfile(data as Profile);
     }
 
     // 2. Log to Gradebook (Student Submissions) - ONLY if metadata is provided (usually module completion)
     if (metadata) {
-      const { error: insertError } = await (supabase as any)
+      await (supabase as any)
         .from("student_submissions")
         .insert({
           user_id: user.id,
@@ -275,12 +266,6 @@ export function UserProvider({ children }: { children: ReactNode }) {
           accuracy: metadata.accuracy || 100,
           completed_at: new Date().toISOString()
         });
-
-      if (insertError) {
-        console.error("[XP Update] Error logging student submission:", insertError);
-      } else {
-        console.log("[XP Update] Student submission logged successfully.");
-      }
     }
   };
 
@@ -300,7 +285,6 @@ export function UserProvider({ children }: { children: ReactNode }) {
 
   const completeTour = async () => {
     if (!user) return;
-    console.log("[Tour] Completing tour for user:", user.id);
     
     try {
       const { error } = await (supabase as any)
@@ -311,14 +295,11 @@ export function UserProvider({ children }: { children: ReactNode }) {
         })
         .eq("id", user.id);
 
-      if (error) {
-        console.error("[Tour] Database update failed:", error);
-      } else {
-        console.log("[Tour] Database update successful.");
+      if (!error) {
         setProfile(prev => prev ? { ...prev, tour_completed: true } : null);
       }
-    } catch (err) {
-      console.error("[Tour] Unexpected error during completion:", err);
+    } catch {
+      // Silently handle tour completion errors
     }
   };
 

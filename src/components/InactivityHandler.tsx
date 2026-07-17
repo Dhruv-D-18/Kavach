@@ -31,15 +31,14 @@ export function InactivityHandler() {
 
   const handleLogoutDueToInactivity = async () => {
     try {
-      console.log("[InactivityHandler] Logged out due to 15 minutes of inactivity.");
       await logout();
       toast.warning("Session Expired", {
         description: "You have been logged out due to 15 minutes of inactivity for project security.",
         duration: 8000,
       });
       router.push("/auth");
-    } catch (error) {
-      console.error("[InactivityHandler] Error logging out:", error);
+    } catch {
+      // Silently handle logout error
     }
   };
 

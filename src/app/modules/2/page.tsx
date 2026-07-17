@@ -4,7 +4,6 @@ import { useState, useEffect } from "react";
 import { Navigation } from "@/components/Navigation";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Badge } from "@/components/ui/badge";
 import { useUser } from "@/context/user-context";
 import { CypherGuide } from "@/components/CypherGuide";
@@ -12,13 +11,9 @@ import { ModuleBriefing } from "@/components/ModuleBriefing";
 import { PhishingSimulator } from "@/components/minigames/PhishingSimulator";
 import { SpotlightOverlay } from "@/components/SpotlightOverlay";
 import { 
-  Shield, 
-  Search, 
   ArrowLeft, 
-  BookOpen, 
   CheckCircle2, 
   AlertTriangle,
-  Mail,
   Zap
 } from "lucide-react";
 import { useRouter } from "next/navigation";
@@ -145,7 +140,7 @@ const TOUR_STEPS = [
 
 export default function PhishingModule() {
   const router = useRouter();
-  const { user, profile, updateScore, isLoading } = useUser();
+  const { user, updateScore, isLoading } = useUser();
   const [scenarios, setScenarios] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [gameState, setGameState] = useState<"theory" | "briefing" | "game" | "complete">("briefing");
@@ -166,18 +161,20 @@ export default function PhishingModule() {
         const { data, error } = await supabase.from('phishing_scenarios').select('*');
         let pool = FALLBACK_SCENARIOS;
         
-        if (data && data.length > 0) {
+        if (!error && data && data.length > 0) {
           pool = data as any;
         }
 
-        // Shuffle and take exactly 2 cases for the session
         const selection = [...pool]
           .sort(() => Math.random() - 0.5)
           .slice(0, 2);
           
-        setScenarios(selection);
-      } catch (err) {
-        console.error("Failed to fetch scenarios from Supabase, using fallbacks:", err);
+        if (selection.length === 0) {
+          setScenarios(FALLBACK_SCENARIOS.sort(() => Math.random() - 0.5).slice(0, 2));
+        } else {
+          setScenarios(selection);
+        }
+      } catch {
         setScenarios(FALLBACK_SCENARIOS.sort(() => Math.random() - 0.5).slice(0, 2));
       } finally {
         setLoading(false);
@@ -192,13 +189,17 @@ export default function PhishingModule() {
     setSessionResults(null);
     setCypherMessage(null);
     
-    // Fetch fresh scenarios
     try {
-      const { data } = await supabase.from('phishing_scenarios').select('*');
-      const pool = data && data.length > 0 ? data : FALLBACK_SCENARIOS;
+      const { data, error } = await supabase.from('phishing_scenarios').select('*');
+      let pool = FALLBACK_SCENARIOS;
+      
+      if (!error && data && data.length > 0) {
+        pool = data as any;
+      }
+      
       const selection = [...pool].sort(() => Math.random() - 0.5).slice(0, 2);
       setScenarios(selection);
-    } catch (err) {
+    } catch {
       setScenarios(FALLBACK_SCENARIOS.sort(() => Math.random() - 0.5).slice(0, 2));
     } finally {
       setLoading(false);
@@ -206,26 +207,37 @@ export default function PhishingModule() {
   };
 
   const handleStartGame = async () => {
-    if (user) await updateScore(50, { moduleId: 2, moduleName: "Phishing Lab (Theory)" }); // Theory completion
-    setGameState("game");
-    setShowTour(true);
-    setTourStep(0);
-    setCypherMessage(TOUR_STEPS[0] as any);
+    try {
+      if (user) await updateScore(50, { moduleId: 2, moduleName: "Phishing Lab (Theory)" });
+      setGameState("game");
+      setShowTour(true);
+      setTourStep(0);
+      setCypherMessage(TOUR_STEPS[0] as any);
+    } catch {
+      setGameState("game");
+      setShowTour(true);
+      setTourStep(0);
+      setCypherMessage(TOUR_STEPS[0] as any);
+    }
   };
 
   const nextTourStep = () => {
-    const nextStep = tourStep + 1;
-    if (nextStep < TOUR_STEPS.length) {
-      setTourStep(nextStep);
-      setCypherMessage(TOUR_STEPS[nextStep] as any);
-    } else {
+    try {
+      const nextStep = tourStep + 1;
+      if (nextStep < TOUR_STEPS.length) {
+        setTourStep(nextStep);
+        setCypherMessage(TOUR_STEPS[nextStep] as any);
+      } else {
+        setShowTour(false);
+        setCypherMessage({
+          text: "Onboarding Complete. The intercept is live. Use your tools to begin the investigation.",
+          type: "success"
+        });
+        setTimeout(() => setCypherMessage(null), 5000);
+      }
+    } catch {
       setShowTour(false);
-      setCypherMessage({
-        text: "Onboarding Complete. The intercept is live. Use your tools to begin the investigation.",
-        type: "success"
-      });
-      // Auto-clear after 5 seconds to not block view
-      setTimeout(() => setCypherMessage(null), 5000);
+      setCypherMessage(null);
     }
   };
 
@@ -248,8 +260,8 @@ export default function PhishingModule() {
           moduleName: "Phishing Lab", 
           accuracy: (results.correctCount / results.totalCount) * 100 
         });
-      } catch (err) {
-        console.error("XP Update failed:", err);
+      } catch {
+        // Continue anyway - game completion should work even if score update fails
       }
     }
 
@@ -282,6 +294,16 @@ export default function PhishingModule() {
         <div className="text-center space-y-4">
           <Zap className="w-12 h-12 text-cyan-500 animate-pulse mx-auto" />
           <div className="text-cyan-500 font-mono tracking-[0.2em] text-sm uppercase animate-pulse">Establishing Secure Connection...</div>
+          <Button 
+            onClick={() => {
+              setLoading(false);
+              setScenarios(FALLBACK_SCENARIOS.sort(() => Math.random() - 0.5).slice(0, 2));
+            }}
+            variant="outline"
+            className="mt-4 border-cyan-500/50 text-cyan-400 hover:bg-cyan-500/10"
+          >
+            Skip Loading
+          </Button>
         </div>
       </div>
     );
@@ -351,8 +373,17 @@ export default function PhishingModule() {
                 </Badge>
               </div>
             )}
-            {scenarios.length > 0 && (
+            {scenarios.length > 0 ? (
               <PhishingSimulator scenarios={scenarios} onComplete={handleGameComplete} />
+            ) : (
+              <div className="text-center py-20">
+                <AlertTriangle className="w-16 h-16 text-yellow-500 mx-auto mb-4 animate-pulse" />
+                <h3 className="text-xl font-bold text-slate-300 mb-2">No Scenarios Available</h3>
+                <p className="text-slate-500 mb-6">Unable to load phishing scenarios. Please try again.</p>
+                <Button onClick={handleRetry} className="bg-cyan-600 hover:bg-cyan-700">
+                  Retry Loading
+                </Button>
+              </div>
             )}
           </>
         )}

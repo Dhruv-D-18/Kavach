@@ -1,20 +1,10 @@
-// src/components/DialogueSystem.tsx
+"use client";
+
 import { useState } from 'react';
 
-interface DialogueTrigger {
-  levelId: string;
-  message: string;
-  position: { x: number, y: number };
-}
+export function DialogueSystem() {
+  const [activeMessage] = useState<string | null>(null);
 
-export function DialogueSystem({ triggers }: { triggers: DialogueTrigger[] }) {
-  const [activeMessage, setActiveMessage] = useState<string | null>(null);
-  
-  const showMessage = (message: string) => {
-    setActiveMessage(message);
-    setTimeout(() => setActiveMessage(null), 5000);
-  };
-  
   return (
     <div>
       {activeMessage && (

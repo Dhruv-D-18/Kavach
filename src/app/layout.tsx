@@ -5,6 +5,7 @@ import { Providers } from "./providers";
 import { UserProvider } from "@/context/user-context";
 import { BootWrapper } from "@/components/BootWrapper";
 import { InactivityHandler } from "@/components/InactivityHandler";
+import { ErrorBoundary } from "@/components/ErrorBoundary";
 
 const inter = Inter({ subsets: ["latin"] });
 
@@ -27,7 +28,9 @@ export default function RootLayout({
         <UserProvider>
           <InactivityHandler />
           <Providers>
-            <BootWrapper>{children}</BootWrapper>
+            <ErrorBoundary>
+              <BootWrapper>{children}</BootWrapper>
+            </ErrorBoundary>
           </Providers>
         </UserProvider>
       </body>

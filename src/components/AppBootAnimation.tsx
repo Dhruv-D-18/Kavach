@@ -35,7 +35,6 @@ export function AppBootAnimation({ onComplete }: AppBootAnimationProps) {
 
     // Emergency timeout - force complete after 10 seconds
     const emergencyTimer = setTimeout(() => {
-      console.log('Boot animation emergency timeout');
       setIsVisible(false);
       onComplete();
     }, 10000);

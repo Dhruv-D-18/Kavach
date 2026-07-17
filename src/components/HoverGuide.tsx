@@ -82,8 +82,7 @@ export function HoverGuide() {
     audioRef.current.src = audioFile;
     audioRef.current.play().then(() => {
       setIsPlaying(true);
-    }).catch(err => {
-      console.error("Audio playback failed:", err);
+    }).catch(() => {
       setCurrentSubtitle(subtitle);
       setTimeout(() => {
         setCurrentSubtitle("");

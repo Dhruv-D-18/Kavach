@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useCallback, useRef } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { EntropyMinigame } from "./minigames/EntropyMinigame";
 import { SocialEngineeringMinigame } from "./minigames/SocialEngineeringMinigame";
 import { HashingMinigame } from "./minigames/HashingMinigame";

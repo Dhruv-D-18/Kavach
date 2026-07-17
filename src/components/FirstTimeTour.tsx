@@ -77,7 +77,6 @@ export function FirstTimeTour({ onComplete }: FirstTimeTourProps) {
     if (currentStep < tourSteps.length - 1) {
       setCurrentStep(currentStep + 1);
     } else {
-      console.log("Tour final step reached, completing...");
       setIsExiting(true);
       onComplete();
     }

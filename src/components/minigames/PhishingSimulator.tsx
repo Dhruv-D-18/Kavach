@@ -1,24 +1,21 @@
 "use client";
 
-import { useState, useEffect, useRef } from "react";
+import { useState } from "react";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from "@/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle, CardFooter } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { 
   Search, 
   ShieldAlert, 
   ShieldCheck, 
-  Shield, 
   Flag, 
   Info, 
   MousePointer2, 
   Lock, 
-  AlertTriangle,
   Mail,
   Globe,
   Monitor,
   CheckCircle2,
-  XCircle
 } from "lucide-react";
 
 interface RedFlag {
@@ -53,7 +50,6 @@ export function PhishingSimulator({ onComplete, scenarios }: PhishingSimulatorPr
   const [activeTool, setActiveTool] = useState<ToolType | null>(null);
   const [findings, setFindings] = useState<Set<string>>(new Set());
   const [showVerdict, setShowVerdict] = useState(false);
-  const [userVerdict, setUserVerdict] = useState<boolean | null>(null);
   const [isCorrect, setIsCorrect] = useState<boolean | null>(null);
   const [hoveredLink, setHoveredLink] = useState<{ display: string; actual: string } | null>(null);
   const [score, setScore] = useState(0);
@@ -80,7 +76,6 @@ export function PhishingSimulator({ onComplete, scenarios }: PhishingSimulatorPr
   };
 
   const submitVerdict = (verdict: boolean) => {
-    setUserVerdict(verdict);
     const correct = verdict === currentScenario.is_real;
     setIsCorrect(correct);
     setShowVerdict(true);
@@ -108,16 +103,9 @@ export function PhishingSimulator({ onComplete, scenarios }: PhishingSimulatorPr
     setActiveTool(null);
     setFindings(new Set());
     setShowVerdict(false);
-    setUserVerdict(null);
     setIsCorrect(null);
     setHoveredLink(null);
     setShowSSL(false);
-  };
-
-  const highlightSentiment = () => {
-    if (activeTool === "sentiment") {
-      handleInspect("body");
-    }
   };
 
   return (

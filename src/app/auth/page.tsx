@@ -10,7 +10,6 @@ import { useSearchParams } from "next/navigation";
 import { useUser } from "@/context/user-context";
 import { useRouter } from "next/navigation";
 import zxcvbn from "zxcvbn";
-import { supabase } from "@/lib/supabase";
 type AuthStep = "form" | "avatar" | "email-sent" | "verifying" | "verified-success";
 
 function AuthContent() {

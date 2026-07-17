@@ -1,7 +1,6 @@
 "use client";
 
 import { useState, useEffect, useRef } from "react";
-import { MessageCircle, X } from "lucide-react";
 import Image from "next/image";
 
 interface CypherMessage {
@@ -37,13 +36,6 @@ export function CypherGuide({
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const [isPlaying, setIsPlaying] = useState(false);
   const [hasEntered, setHasEntered] = useState(false);
-
-  // Debugging log to confirm the component is being called
-  useEffect(() => {
-    if (isVisible && message) {
-      console.log("CypherGuide triggered with message:", message.text);
-    }
-  }, [isVisible, message]);
 
   // Handle entry state
   useEffect(() => {
@@ -91,8 +83,7 @@ export function CypherGuide({
         audioRef.current.play().then(() => {
           setIsPlaying(true);
           setIsTyping(false);
-        }).catch(err => {
-          console.warn("Audio block/error:", err);
+        }).catch(() => {
           setIsTyping(false);
         });
       } else {
@@ -110,7 +101,6 @@ export function CypherGuide({
   if (!isVisible || !displayedMessage) return null;
 
   const isLeft = position.includes("left");
-  const isTop = position.includes("top");
 
   const getPositionClasses = () => {
     switch (position) {
@@ -232,7 +222,6 @@ export function CypherGuide({
                     {onNext && (
                       <button 
                         onClick={() => {
-                          console.log("HUD Continue clicked");
                           if (audioRef.current) audioRef.current.pause();
                           setIsPlaying(false);
                           onNext();
